@@ -1,10 +1,11 @@
-<p align="center"><img src="https://raw.githubusercontent.com/jellyfin/jellyfin-roku/master/images/channel-poster_fhd.png" style="border: 1px solid #eee; border-radius: 4px" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/ferezvi/ocelotl-roku/master/images/channel-poster_fhd.png" style="border: 1px solid #eee; border-radius: 4px" /></p>
 
-<h1 align="center">Jellyfin for Roku</h1>
-<p align="center">The official <strong>Jellyfin</strong> Roku client.</p>
+<h1 align="center">Ocelotl Roku</h1>
+<p align="center">A refined <strong>Jellyfin</strong> experience for Roku devices.</p>
 <p align="center">Navigate your Jellyfin library and watch, listen, and view your media.</p>
 <p align="center">Cool features include song lyric support, trickplay images, media segment support, downloading subtitles direct from your Roku, and more.</p>
-<h2 align="center">Part of the <a href="https://jellyfin.org">Jellyfin Project</a></h2>
+<h2 align="center">Based on the official <a href="https://jellyfin.org">Jellyfin</a> Roku client</h2>
+<p align="center">The official Jellyfin Roku client is highly recommended for users who prefer the original experience.</p>
 <p align="center"><a href="https://channelstore.roku.com/en-ca/details/4d9e526a7d972d4decf98ea6a84000f7:c617f4902629cc0bd1e1411db1775cf3/jellyfin">Roku Channel Store</a></p>
 
 <h2>Screenshots</h2>
