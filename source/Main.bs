@@ -359,6 +359,8 @@ sub setBackgroundImage()
         })
     end if
 
+    if isStringEqual(selectedBackgroundImage, string.EMPTY) then return
+
     m.scene.callFunc("setBackgroundImage", selectedBackgroundImage)
 end sub
 

@@ -20,7 +20,7 @@ sub init()
     m.serverUrlContainer.blendColor = ColorPalette.ELEMENTBACKGROUND
 
     m.submit = m.top.findNode("submit")
-    m.submit.background = ColorPalette.TRIADBLUE
+    m.submit.background = ColorPalette.SMOKE
     m.submit.color = ColorPalette.WHITE
     m.submit.focusBackground = ColorPalette.HIGHLIGHT
     m.submit.focusColor = ColorPalette.WHITE

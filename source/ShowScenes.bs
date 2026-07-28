@@ -605,9 +605,9 @@ function CreateHomeGroup()
     sidepanel.observeField("closeSidePanel", m.port)
     new_options = []
     options_buttons = [
-        { "title": "Change user", "id": "change_user" },
-        { "title": "Change server", "id": "change_server" },
-        { "title": "Sign out", "id": "sign_out" }
+        { "title": "Change User", "id": "change_user" },
+        { "title": "Change Server", "id": "change_server" },
+        { "title": "Sign Out", "id": "sign_out" }
     ]
     for each opt in options_buttons
         o = CreateObject("roSGNode", "OptionsButton")

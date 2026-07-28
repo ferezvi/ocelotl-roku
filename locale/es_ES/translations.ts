@@ -9615,7 +9615,7 @@
     </message>
     <message>
         <source>Change Server</source>
-        <translation>Cambiar servidor</translation>
+        <translation>Cambiar Servidor</translation>
     </message>
     <message>
         <source>Error Retrieving Content</source>
@@ -9629,7 +9629,7 @@
     </message>
     <message>
         <source>Sign Out</source>
-        <translation>Cerrar sesión</translation>
+        <translation>Cerrar Sesión</translation>
     </message>
     <message>
         <source>Loading Channel Data</source>

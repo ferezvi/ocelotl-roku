@@ -4,7 +4,7 @@ import "pkg:/source/enums/PosterLoadStatus.bs"
 import "pkg:/source/enums/String.bs"
 import "pkg:/source/utils/misc.bs"
 
-const blankUserAvatarUri = "pkg:/images/baseline_person_white_48dp.png"
+const blankUserAvatarUri = "pkg:/images/ocelotl/avatars/baseline_person_gradient_48dp.png"
 
 sub onProfileImageUriChange()
     if not isValid(m.top.profileImageUri)
@@ -31,19 +31,23 @@ end sub
 sub init()
     m.top.setFocus(true)
     m.top.optionsAvailable = false
+    m.top.overhangVisible = false
+
+    m.signInFormContainer = m.top.findNode("signInFormContainer")
+    m.signInFormContainer.blendColor = ColorPalette.ELEMENTBACKGROUND
 
     m.profileImage = m.top.findNode("overlayCurrentUserProfileImage")
     m.profileImage.observeField("loadStatus", "onPosterLoadStatusChanged")
 
     m.submit = m.top.findNode("submit")
-    m.submit.background = ColorPalette.LIGHTBLUE
-    m.submit.color = ColorPalette.DARKGREY
+    m.submit.background = ColorPalette.SMOKE
+    m.submit.color = ColorPalette.WHITE
     m.submit.focusBackground = ColorPalette.HIGHLIGHT
     m.submit.focusColor = ColorPalette.WHITE
 
     m.quickConnect = m.top.findNode("quickConnect")
-    m.quickConnect.background = ColorPalette.LIGHTBLUE
-    m.quickConnect.color = ColorPalette.DARKGREY
+    m.quickConnect.background = ColorPalette.SMOKE
+    m.quickConnect.color = ColorPalette.WHITE
     m.quickConnect.focusBackground = ColorPalette.HIGHLIGHT
     m.quickConnect.focusColor = ColorPalette.WHITE
 
@@ -51,6 +55,7 @@ sub init()
     m.errorContainer.color = "#CC0000"
 
     m.config = m.top.findNode("configOptions")
+    m.config.focusBitmapUri = "pkg:/images/ocelotl/ui/panels/server_panel.9.png"
     m.config.focusBitmapBlendColor = ColorPalette.HIGHLIGHT
     m.config.focusFootprintBlendColor = ColorPalette.TRANSPARENT
     ' When the last form field is confirmed, jump focus straight to Submit
