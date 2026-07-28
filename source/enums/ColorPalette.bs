@@ -3,7 +3,7 @@ enum ColorPalette
     BLACK90 = "0x00000090"
     BLACKDD = "0x000000DD"
     DARKGREY = "#101010"
-    ELEMENTBACKGROUND = "#101420"
+    ELEMENTBACKGROUND = "#1c2436"
     HIGHLIGHT = "0xff6867FF"
     LIGHTBLUE = "#c8fafa"
     LIGHTGREY = "#aaaaaa"
