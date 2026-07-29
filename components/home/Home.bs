@@ -270,6 +270,54 @@ sub onHomeItemFocusedChange()
             end if
         end if
 
+        ' Music albums: own backdrop -> artist backdrop -> album art fallback
+        if focusedItem.type = "MusicAlbum" or focusedItem.type = "Audio"
+
+            if isValidAndNotEmpty(focusedItem.json.BackdropImageTags)
+                backdrop = ImageURL(focusedItem.id, ImageType.BACKDROP, {
+                    maxHeight: backdropHeight,
+                    maxWidth: backdropWidth,
+                    quality: "90"
+                })
+
+                if backdrop <> ""
+                    setBackdropImage(backdrop)
+                    return
+                end if
+            end if
+
+            if isValidAndNotEmpty(focusedItem.json.AlbumArtists)
+                artistId = focusedItem.json.AlbumArtists[0].Id
+
+                if isValidAndNotEmpty(artistId)
+                    artistBackdrop = ImageURL(artistId, ImageType.BACKDROP, {
+                        maxHeight: backdropHeight,
+                        maxWidth: backdropWidth,
+                        quality: "90"
+                    })
+
+                    if artistBackdrop <> ""
+                        setBackdropImage(artistBackdrop)
+                        return
+                    end if
+                end if
+            end if
+
+            if isValidAndNotEmpty(focusedItem.json.ImageTags)
+                albumArt = ImageURL(focusedItem.id, ImageType.PRIMARY, {
+                    maxHeight: backdropHeight,
+                    maxWidth: backdropWidth,
+                    quality: "90"
+                })
+
+                if albumArt <> ""
+                    setBackdropImage(albumArt)
+                    return
+                end if
+            end if
+
+        end if
+
         ' Episodes use the parent series' backdrop
         if focusedItem.type = "Episode" and isValidAndNotEmpty(focusedItem.json.seriesid)
             backdrop = ImageURL(focusedItem.json.seriesid, ImageType.BACKDROP, {
