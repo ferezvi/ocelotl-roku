@@ -3,6 +3,7 @@ import "pkg:/source/api/Image.bs"
 import "pkg:/source/enums/AnimationControl.bs"
 import "pkg:/source/enums/AnimationState.bs"
 import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/enums/ImageType.bs"
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/TaskControl.bs"
@@ -28,6 +29,27 @@ sub init()
 
     m.homeRows = m.top.findNode("homeRows")
     m.homeRows.focusBitmapBlendColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+
+    m.backdropA = m.top.findNode("backdropA")
+    m.backdropB = m.top.findNode("backdropB")
+    m.backdropA.observeField("loadStatus", "onBackdropLoaded")
+    m.backdropB.observeField("loadStatus", "onBackdropLoaded")
+
+    m.backdropOverlay = m.top.findNode("backdropOverlay")
+    m.backdropOverlay.color = ColorPalette.BACKDROP_OVERLAY
+    m.backdropOverlayFade = m.top.findNode("backdropOverlayFade")
+
+    ' Poster currently shown vs. the one used to preload the next image
+    m.activeBackdrop = m.backdropA
+    m.inactiveBackdrop = m.backdropB
+
+    m.backdropCrossfadeAnimation = m.top.findNode("backdropCrossfadeAnimation")
+    m.backdropAFade = m.top.findNode("backdropAFade")
+    m.backdropBFade = m.top.findNode("backdropBFade")
+
+    ' Tracks which node's load event we're waiting on, to ignore stale
+    ' events from rapid navigation
+    m.pendingBackdropTarget = invalid
 
     m.buttons = m.top.findNode("buttons")
     m.toggleButtonsAnimation = m.top.findNode("toggleButtonsAnimation")
@@ -141,6 +163,131 @@ sub toggleButtonsVisibility(runInReverse = false as boolean)
     if not isStringEqual(m.toggleButtonsAnimation.state, AnimationState.RUNNING)
         m.toggleButtonsAnimation.control = AnimationControl.START
     end if
+end sub
+
+sub setBackdropImage(backdropUri as string)
+
+    if backdropUri = ""
+        startBackdropFade(m.activeBackdrop, invalid)
+        return
+    end if
+
+    ' Already showing this backdrop at full opacity - nothing to do
+    if backdropUri = m.activeBackdrop.uri and m.activeBackdrop.opacity = 1.0
+        return
+    end if
+
+    ' Same image, currently faded out (focus moved away then came back) -
+    ' just fade it back in, no reload needed
+    if backdropUri = m.activeBackdrop.uri
+        startBackdropFade(m.inactiveBackdrop, m.activeBackdrop)
+        return
+    end if
+
+    ' Already preloaded in the inactive poster (e.g. navigating back a step)
+    if backdropUri = m.inactiveBackdrop.uri and m.inactiveBackdrop.loadStatus = "ready"
+        startBackdropFade(m.activeBackdrop, m.inactiveBackdrop)
+        return
+    end if
+
+    m.inactiveBackdrop.uri = backdropUri
+    m.pendingBackdropTarget = m.inactiveBackdrop
+
+end sub
+
+sub onBackdropLoaded(event as object)
+    node = event.GetRoSGNode()
+
+    ' Ignore load events from a backdrop that's no longer the pending target
+    if not isValid(m.pendingBackdropTarget) then return
+    if not node.isSameNode(m.pendingBackdropTarget) then return
+    if node.loadStatus <> "ready" then return
+
+    startBackdropFade(m.activeBackdrop, node)
+end sub
+
+' Crossfades between the two backdrop posters. If incoming is invalid,
+' just fades the outgoing poster to black (used to clear the backdrop).
+sub startBackdropFade(outgoing as object, incoming = invalid as dynamic)
+
+    ' Stop mid-flight so a fast focus change redirects smoothly
+    if isStringEqual(m.backdropCrossfadeAnimation.state, AnimationState.RUNNING)
+        m.backdropCrossfadeAnimation.control = AnimationControl.STOP
+    end if
+
+    ' Default both interpolators to hold current value so starting the
+    ' animation doesn't replay a stale keyValue on the untouched poster
+    m.backdropAFade.keyValue = [m.backdropA.opacity, m.backdropA.opacity]
+    m.backdropBFade.keyValue = [m.backdropB.opacity, m.backdropB.opacity]
+
+    outgoingInterpolator = outgoing.isSameNode(m.backdropA) ? m.backdropAFade : m.backdropBFade
+    outgoingInterpolator.keyValue = [outgoing.opacity, 0.0]
+
+    ' Fade the dark overlay in/out together with the backdrop, so the
+    ' static background is never tinted separately from the image transition
+    m.backdropOverlayFade.keyValue = [m.backdropOverlay.opacity, isValid(incoming) ? 1.0 : 0.0]
+
+    if isValid(incoming)
+        incomingInterpolator = incoming.isSameNode(m.backdropA) ? m.backdropAFade : m.backdropBFade
+        incomingInterpolator.keyValue = [incoming.opacity, 1.0]
+
+        m.activeBackdrop = incoming
+        m.inactiveBackdrop = outgoing
+    end if
+
+    m.pendingBackdropTarget = invalid
+    m.backdropCrossfadeAnimation.control = AnimationControl.START
+end sub
+
+sub onHomeItemFocusedChange()
+    if not isValid(m.homeRows.rowItemFocused) then return
+
+    row = m.homeRows.rowItemFocused[0]
+    col = m.homeRows.rowItemFocused[1]
+
+    focusedItem = m.homeRows.content.getChild(row).getChild(col)
+    if not isValid(focusedItem) then return
+
+    ' Request backdrop at the device's actual resolution to avoid
+    ' loading an oversized FHD texture on HD devices
+    isHD = chainLookupReturn(m.global.device, "isHDDevice", false)
+    backdropWidth = isHD ? "1280" : "1920"
+    backdropHeight = isHD ? "720" : "1080"
+
+    if isValid(focusedItem.json)
+
+        ' Movies / Series with their own backdrop
+        if isValidAndNotEmpty(focusedItem.json.BackdropImageTags)
+            backdrop = ImageURL(focusedItem.id, ImageType.BACKDROP, {
+                maxHeight: backdropHeight,
+                maxWidth: backdropWidth,
+                quality: "90"
+            })
+
+            if backdrop <> ""
+                setBackdropImage(backdrop)
+                return
+            end if
+        end if
+
+        ' Episodes use the parent series' backdrop
+        if focusedItem.type = "Episode" and isValidAndNotEmpty(focusedItem.json.seriesid)
+            backdrop = ImageURL(focusedItem.json.seriesid, ImageType.BACKDROP, {
+                maxHeight: backdropHeight,
+                maxWidth: backdropWidth,
+                quality: "90"
+            })
+
+            if backdrop <> ""
+                setBackdropImage(backdrop)
+                return
+            end if
+        end if
+
+    end if
+
+    ' No backdrop available: clear previous image
+    setBackdropImage("")
 end sub
 
 sub onMyListLoaded()

@@ -1,4 +1,5 @@
 enum ColorPalette
+    BACKDROP_OVERLAY = "0x00000099"
     BLACK77 = "0x00000077"
     BLACK90 = "0x00000090"
     BLACKDD = "0x000000DD"

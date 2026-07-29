@@ -3,8 +3,15 @@ import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
 sub init()
-    m.top.backgroundURI = ""
+    m.imageBackground = m.top.findNode("imageBackground")
     m.spinner = m.top.findNode("spinner")
+
+    m.top.observeField("appBackgroundURI", "onBackgroundChanged")
+    setBackgroundImage(m.top.appBackgroundURI)
+end sub
+
+sub onBackgroundChanged()
+    setBackgroundImage(m.top.appBackgroundURI)
 end sub
 
 ' Triggered when the isLoading boolean component field is changed
@@ -15,6 +22,9 @@ end sub
 sub setBackgroundImage(backgroundURI as string)
     imageBackground = m.top.findNode("imageBackground")
     if not isValid(imageBackground) then return
+
+    ' Ignore empty URIs so we don't wipe out the default background image
+    if backgroundURI = "" then return
 
     imageBackground.uri = backgroundURI
 end sub
