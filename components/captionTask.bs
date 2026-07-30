@@ -45,8 +45,8 @@ sub init()
     deviceWindowOpacity = chainLookupReturn(m.windowPercentageDict, deviceInfo.GetCaptionsOption("Window/Opacity"), "00")
     m.windowBgColor = `${deviceWindowColor}${deviceWindowOpacity}`
 
-    if isValidAndNotEmpty(m.global.fallbackFont)
-        m.fonts = m.global.fallbackFont
+    if isValidAndNotEmpty(m.global.captionFont)
+        m.fonts = m.global.captionFont
     else
         fontFamily = getPackagedFontFamily(deviceInfo.GetCaptionsOption("Text/Font"))
         m.fonts = getPackagedFonts(fontFamily)

@@ -38,7 +38,10 @@ sub Main (args as dynamic) as void
     m.global.addFields({ queueManager: CreateObject("roSGNode", "QueueManager") })
     m.global.addFields({ audioPlayer: CreateObject("roSGNode", "AudioPlayer") })
     m.global.addFields({ jumpTo: {} })
-    m.global.addFields({ fallbackFont: {} })
+    m.global.addFields({
+        fallbackFont: {},
+        captionFont: {}
+    })
 
     m.global.observeField("jumpTo", m.port)
 
@@ -224,10 +227,13 @@ sub downloadFallbackFont()
     if not isValidAndNotEmpty(files) then return
 
     fallbackFont = {}
+    captionFont = {}
+
     for each fontFile in files
         if not isChainValid(fontFile, "name") then continue for
 
         fontName = chainLookup(fontFile, "name")
+        isCaption = isCaptionFont(fontName)
 
         lowerCaseFontName = LCase(fontName)
         if not lowerCaseFontName.endsWith(".ttf") and not lowerCaseFontName.endsWith(".otf") then continue for
@@ -236,37 +242,64 @@ sub downloadFallbackFont()
         fileNeeded = false
 
         if lowerCaseFontName.instr("bold") <> -1 and lowerCaseFontName.instr("italic") <> -1
+
             if not isValid(fallbackFont.boldItalic)
                 fallbackFont.boldItalic = fontUri
                 fileNeeded = true
             end if
+
+            if isCaption and not isValid(captionFont.boldItalic)
+                captionFont.boldItalic = fontUri
+            end if
+
         else if lowerCaseFontName.instr("bold") <> -1
+
             if not isValid(fallbackFont.bold)
                 fallbackFont.bold = fontUri
                 fileNeeded = true
             end if
+
+            if isCaption and not isValid(captionFont.bold)
+                captionFont.bold = fontUri
+            end if
+
         else if lowerCaseFontName.instr("italic") <> -1
+
             if not isValid(fallbackFont.italic)
                 fallbackFont.italic = fontUri
                 fileNeeded = true
             end if
-        else if not isValid(fallbackFont.regular)
-            fallbackFont.regular = fontUri
-            fileNeeded = true
+
+            if isCaption and not isValid(captionFont.italic)
+                captionFont.italic = fontUri
+            end if
+
+        else
+
+            if not isValid(fallbackFont.regular)
+                fallbackFont.regular = fontUri
+                fileNeeded = true
+            end if
+
+            if isCaption and not isValid(captionFont.regular)
+                captionFont.regular = fontUri
+            end if
+
         end if
 
         if fileNeeded
-            ' This exercise prevents downloading font files we won't use
             APIRequest(api.fallbackFont.GetFontURL(fontName)).gettofile(fontUri)
 
-            ' Stop loop if we've downloaded all needed fonts
             if fallbackFont.count() = 4 then exit for
         end if
     end for
 
-    if fallbackFont.count() = 0 then return ' No valid font files were downloaded
 
-    ' Make sure every style is set
+    if fallbackFont.count() = 0 then return
+
+
+    ' Complete server font family
+
     if not isValid(fallbackFont.regular)
         if isValid(fallbackFont.bold)
             fallbackFont.regular = fallbackFont.bold
@@ -295,8 +328,56 @@ sub downloadFallbackFont()
         end if
     end if
 
+
+    ' Complete caption font family if found
+
+    if isValid(captionFont.regular)
+
+        if not isValid(captionFont.bold)
+            captionFont.bold = captionFont.regular
+        end if
+
+        if not isValid(captionFont.italic)
+            captionFont.italic = captionFont.regular
+        end if
+
+        if not isValid(captionFont.boldItalic)
+            if isValid(captionFont.italic)
+                captionFont.boldItalic = captionFont.italic
+            else if isValid(captionFont.bold)
+                captionFont.boldItalic = captionFont.bold
+            else
+                captionFont.boldItalic = captionFont.regular
+            end if
+        end if
+
+    end if
+
+
+    print "SERVER FONT:", fallbackFont
+    print "CAPTION FONT:", captionFont
+
     m.global.fallbackFont = fallbackFont
+    m.global.captionFont = captionFont
 end sub
+
+function isCaptionFont(name as string) as boolean
+    lower = LCase(name)
+
+    if lower.instr("cc") > -1 then return true
+    if lower.instr("caption") > -1 then return true
+    if lower.instr("subtitle") > -1 then return true
+    if lower.instr("cjk") > -1 then return true
+    if lower.instr("jp") > -1 then return true
+    if lower.instr("japan") > -1 then return true
+    if lower.instr("kr") > -1 then return true
+    if lower.instr("korea") > -1 then return true
+    if lower.instr("hk") > -1 then return true
+    if lower.instr("chinese") > -1 then return true
+    if lower.instr("zh") > -1 then return true
+
+    return false
+end function
 
 sub clearOldLibraryFilters()
     forgetFilters = m.global.session.user.settings["itemgrid.forgetFilters"] ?? true
