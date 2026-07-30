@@ -226,6 +226,20 @@ sub downloadFallbackFont()
     files = api.fallbackFont.GetFonts()
     if not isValidAndNotEmpty(files) then return
 
+    ' Build a lookup of the names the server currently offers, so we can
+    ' tell apart "still valid" from "stale" registry/cache entries below.
+    currentFontNames = {}
+    for each f in files
+        if isChainValid(f, "name")
+            currentFontNames[chainLookup(f, "name")] = true
+        end if
+    end for
+
+    fontCacheRegistry = CreateObject("roRegistrySection", "FallbackFontCache")
+    fs = CreateObject("roFileSystem")
+
+    cleanupStaleFontCache(fs, fontCacheRegistry, currentFontNames)
+
     fallbackFont = {}
     captionFont = {}
 
@@ -233,12 +247,15 @@ sub downloadFallbackFont()
         if not isChainValid(fontFile, "name") then continue for
 
         fontName = chainLookup(fontFile, "name")
+        fontSize = chainLookup(fontFile, "size") ' bytes, as reported by the server
         isCaption = isCaptionFont(fontName)
 
         lowerCaseFontName = LCase(fontName)
         if not lowerCaseFontName.endsWith(".ttf") and not lowerCaseFontName.endsWith(".otf") then continue for
 
-        fontUri = `tmp:/${fontName}`
+        ' cachefs persists across channel runs (unlike tmp:/, which is volatile),
+        ' so downloaded fonts survive relaunches until the OS evicts them for space
+        fontUri = `cachefs:/${fontName}`
         fileNeeded = false
 
         if lowerCaseFontName.instr("bold") <> -1 and lowerCaseFontName.instr("italic") <> -1
@@ -288,7 +305,18 @@ sub downloadFallbackFont()
         end if
 
         if fileNeeded
-            APIRequest(api.fallbackFont.GetFontURL(fontName)).gettofile(fontUri)
+            needsDownload = shouldDownloadFont(fs, fontCacheRegistry, fontUri, fontName, fontSize)
+
+            if needsDownload
+                result = APIRequest(api.fallbackFont.GetFontURL(fontName)).gettofile(fontUri)
+
+                ' Only remember the size once the download actually succeeded,
+                ' otherwise a failed transfer would get treated as "cached" next launch
+                if isValid(result) and result and isValid(fontSize)
+                    fontCacheRegistry.Write(fontName, fontSize.ToStr())
+                    fontCacheRegistry.Flush()
+                end if
+            end if
 
             if fallbackFont.count() = 4 then exit for
         end if
@@ -353,12 +381,40 @@ sub downloadFallbackFont()
 
     end if
 
-
-    print "SERVER FONT:", fallbackFont
-    print "CAPTION FONT:", captionFont
-
     m.global.fallbackFont = fallbackFont
     m.global.captionFont = captionFont
+end sub
+
+
+function shouldDownloadFont(fs as object, registry as object, fontUri as string, fontName as string, fontSize as dynamic) as boolean
+    if not fs.Exists(fontUri) then return true
+
+    ' If the server didn't give us a size to compare against, fall back to
+    ' "trust the cache" behavior rather than re-downloading every launch.
+    if not isValid(fontSize) then return false
+
+    if not registry.Exists(fontName) then return true
+
+    cachedSize = registry.Read(fontName)
+    return cachedSize <> fontSize.ToStr()
+end function
+
+
+sub cleanupStaleFontCache(fs as object, registry as object, currentFontNames as object)
+    for each cachedName in registry.GetKeyList()
+        if currentFontNames.DoesExist(cachedName) then continue for
+
+        ' This font is no longer offered by the server — drop the cached
+        ' file and its registry entry so they don't accumulate forever.
+        staleUri = `cachefs:/${cachedName}`
+        if fs.Exists(staleUri)
+            fs.Delete(staleUri)
+        end if
+
+        registry.Delete(cachedName)
+    end for
+
+    registry.Flush()
 end sub
 
 function isCaptionFont(name as string) as boolean
