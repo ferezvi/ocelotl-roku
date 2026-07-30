@@ -638,7 +638,7 @@
                 "description": "The text color of the second line displayed under items.",
                 "settingName": "colorHomeRowItemSubtitle",
                 "type": "colorgrid",
-                "default": "#777777"
+                "default": "#DDDDDD"
               },
               {
                 "title": "Row Item Title",
