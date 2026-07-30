@@ -621,10 +621,13 @@ sub adjustForCaptionOverlaps(newCaption, existingCaptions, moveDirection = Capti
                 moveDirection = CaptionMoveDirection.DOWN
             end if
 
+            ' Keep overlapping WebVTT cues flush against each other.
+            ' Extra spacing creates visible gaps between stacked
+            ' caption background boxes.
             if moveDirection = CaptionMoveDirection.DOWN
-                calculatedVerticalPosition = newCaptionBounds.y + newCaptionBounds.height + 5
+                calculatedVerticalPosition = newCaptionBounds.y + newCaptionBounds.height
             else
-                calculatedVerticalPosition = newCaptionBounds.y - comparisonCaptionBounds.height - 5
+                calculatedVerticalPosition = newCaptionBounds.y - comparisonCaptionBounds.height
             end if
 
             if calculatedVerticalPosition < 0 then calculatedVerticalPosition = 0
