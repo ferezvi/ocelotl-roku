@@ -48,12 +48,8 @@ sub init()
     if isValidAndNotEmpty(m.global.fallbackFont)
         m.fonts = m.global.fallbackFont
     else
-        m.fonts = {
-            "regular": "font:LargeSystemFont",
-            "bold": "font:LargeBoldSystemFont",
-            "italic": "font:LargeSystemFont",
-            "bolditalic": "font:LargeBoldSystemFont"
-        }
+        fontFamily = getPackagedFontFamily(deviceInfo.GetCaptionsOption("Text/Font"))
+        m.fonts = getPackagedFonts(fontFamily)
     end if
     ' Calculate and store the max line height for all font variants (used for per-line backgrounds)
     m.lineHeights = getLineHeights()
@@ -761,4 +757,41 @@ function getLineHeights() as object
         single: singleLineHeight,
         multi: twoLinesTotal - singleLineHeight
     }
+end function
+
+' Maps Roku's CEA-708 caption font style accessibility option to one of
+' our packaged font families. Small Caps can't render as true small caps
+' since font subsetting drops GSUB/GPOS/GDEF/STAT tables, so it falls
+' back to Sans like Default and Casual. Cursive/Casual have no dedicated
+' family; Serif/Sans are used as the closest available approximations.
+function getPackagedFontFamily(textFont as string) as string
+    if textFont = "Small Caps"
+        return "OcelotlSansSmallCaps"
+    else if textFont = "Proportional Serif" or textFont = "Cursive"
+        return "OcelotlSerif"
+    else if textFont = "Monospaced Serif" or textFont = "Monospaced Sans-Serif"
+        return "OcelotlMono"
+    end if
+
+    return "OcelotlSerif"
+end function
+
+' Builds the regular/bold/italic/bolditalic fontUri set for a packaged
+' family, matching the *-Regular.ttf / -Bold.ttf / -Italic.ttf /
+' -BoldItalic.ttf naming used by the font build scripts.
+function getPackagedFonts(family as string) as object
+    fonts = {
+        "regular": `pkg:/fonts/${family}-Regular.ttf`,
+        "bold": `pkg:/fonts/${family}-Bold.ttf`,
+        "italic": `pkg:/fonts/${family}-Italic.ttf`,
+        "bolditalic": `pkg:/fonts/${family}-BoldItalic.ttf`
+    }
+
+    ' Mono and SmallCaps ship Regular/Bold only - reuse upright styles
+    if family = "OcelotlMono" or family = "OcelotlSansSmallCaps"
+        fonts.italic = fonts.regular
+        fonts.bolditalic = fonts.bold
+    end if
+
+    return fonts
 end function

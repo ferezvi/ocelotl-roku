@@ -1,8 +1,8 @@
 {
-  "name": "jellyfin",
+  "name": "ocelotl",
   "type": "module",
-  "version": "3.2.2",
-  "description": "Official Roku app for Jellyfin media server",
+  "version": "0.1.0",
+  "description": "Ocelotl media client for Roku, based on Jellyfin Roku",
   "dependencies": {
     "@rokucommunity/bslib": "0.1.1",
     "brighterscript-formatter": "1.8.1"
@@ -20,18 +20,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jellyfin/jellyfin-roku.git"
+    "url": "https://github.com/ferezvi/ocelotl-roku.git"
   },
   "keywords": [
+    "ocelotl",
     "jellyfin",
     "roku",
-    "music",
-    "movies"
+    "media",
+    "streaming"
   ],
-  "author": "Jellyfin",
+  "author": "ferezvi and the Ocelotl contributors",
   "license": "GPL-2.0",
   "bugs": {
-    "url": "https://github.com/jellyfin/jellyfin-roku"
+    "url": "https://github.com/ferezvi/ocelotl-roku/issues"
   },
-  "homepage": "https://github.com/jellyfin/jellyfin-roku"
+  "homepage": "https://github.com/ferezvi/ocelotl-roku"
 }
