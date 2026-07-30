@@ -423,14 +423,6 @@ function isCaptionFont(name as string) as boolean
     if lower.instr("cc") > -1 then return true
     if lower.instr("caption") > -1 then return true
     if lower.instr("subtitle") > -1 then return true
-    if lower.instr("cjk") > -1 then return true
-    if lower.instr("jp") > -1 then return true
-    if lower.instr("japan") > -1 then return true
-    if lower.instr("kr") > -1 then return true
-    if lower.instr("korea") > -1 then return true
-    if lower.instr("hk") > -1 then return true
-    if lower.instr("chinese") > -1 then return true
-    if lower.instr("zh") > -1 then return true
 
     return false
 end function
