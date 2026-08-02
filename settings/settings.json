@@ -659,6 +659,23 @@
         ]
       },
       {
+        "title": "Theme",
+        "description": "Select which visual theme to use for the app's screens and components.",
+        "settingName": "ui.theme",
+        "type": "radio",
+        "default": "ocelotl",
+        "options": [
+          {
+            "title": "Ocelotl",
+            "id": "ocelotl"
+          },
+          {
+            "title": "Jellyfin Roku",
+            "id": "jellyfin-roku"
+          }
+        ]
+      },
+      {
         "title": "General",
         "description": "Settings relating to the appearance of the Home screen and the program in general.",
         "children": [

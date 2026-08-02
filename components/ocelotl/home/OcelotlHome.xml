@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="OcelotlHome" extends="JFScreen">
+    <children>
+        <Rectangle id="background" width="1920" height="1080" color="#0E0323FF" />
+
+        <OcelotlTopBar id="topBar" translation="[0, 0]" />
+        <OcelotlSidebar id="sidebar" translation="[0, 0]" />
+
+        <HomeRows
+            id="homeRows"
+            translation="[300, 140]"
+            showRowLabel="true"
+            vertFocusAnimationStyle="fixedFocus"
+            rowFocusAnimationStyle="fixedFocus"
+            itemComponentName="HomeItem"
+            numRows="2"
+            rowLabelOffset="[[0,20]]" />
+
+        <OptionsSlider id="options" visible="false" />
+    </children>
+    <interface>
+        <field id="playlistData" type="array" />
+        <field id="selectedItem" alias="homeRows.selectedItem" />
+        <field id="rowFocused" alias="homeRows.itemFocused" onchange="onRowFocusedChange" />
+        <field id="quickPlayNode" alias="homeRows.quickPlayNode" />
+        <function name="refresh" />
+        <function name="loadLibraries" />
+    </interface>
+</component>

@@ -1,0 +1,101 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.clockLabel = m.top.findNode("clock")
+
+    m.searchIcon = m.top.findNode("searchIcon")
+    m.settingsIcon = m.top.findNode("settingsIcon")
+
+    updateHighlight()
+
+    m.clockTimer = m.top.findNode("clockTimer")
+    m.clockTimer.observeField("fire", "updateClock")
+    updateClock()
+
+    m.top.observeField("focusedChild", "onFocusChanged")
+end sub
+
+sub onFocusChanged()
+    updateHighlight()
+end sub
+
+sub updateClock()
+    dt = CreateObject("roDateTime")
+    dt.ToLocalTime()
+
+    hour24 = dt.GetHours()
+    minutes = dt.GetMinutes()
+
+    suffix = "am"
+    hour12 = hour24
+    if hour24 = 0
+        hour12 = 12
+    else if hour24 = 12
+        suffix = "pm"
+    else if hour24 > 12
+        hour12 = hour24 - 12
+        suffix = "pm"
+    end if
+
+    minutesStr = minutes.ToStr()
+    if minutes < 10 then minutesStr = "0" + minutesStr
+
+    m.clockLabel.text = hour12.ToStr() + ":" + minutesStr + " " + suffix
+end sub
+
+sub updateHighlight()
+
+    if not m.top.isInFocusChain()
+        m.searchIcon.blendColor = ColorPalette.TEXT_SECONDARY
+        m.settingsIcon.blendColor = ColorPalette.TEXT_SECONDARY
+        return
+    end if
+
+    if m.top.focusedIndex = 0
+        m.searchIcon.blendColor = ColorPalette.PRIMARY
+        m.settingsIcon.blendColor = ColorPalette.TEXT_SECONDARY
+    else
+        m.searchIcon.blendColor = ColorPalette.TEXT_SECONDARY
+        m.settingsIcon.blendColor = ColorPalette.PRIMARY
+    end if
+
+end sub
+
+sub onFocusedIndexChange()
+    updateHighlight()
+end sub
+
+sub refreshHighlight()
+    updateHighlight()
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if isStringEqual(key, KeyCode.LEFT)
+        if m.top.focusedIndex > 0
+            m.top.focusedIndex = m.top.focusedIndex - 1
+        end if
+        return true
+    end if
+
+    if isStringEqual(key, KeyCode.RIGHT)
+        if m.top.focusedIndex < 1
+            m.top.focusedIndex = m.top.focusedIndex + 1
+        end if
+        return true
+    end if
+
+    if isStringEqual(key, KeyCode.OK)
+        if m.top.focusedIndex = 0
+            m.top.getScene().jumpTo = { selectionType: "search" }
+        else
+            m.top.getScene().jumpTo = { selectionType: "settings" }
+        end if
+        return true
+    end if
+
+    return false
+end function

@@ -1,0 +1,61 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.itemIds = ["navItem_0", "navItem_1", "navItem_2", "navItem_3", "navItem_4", "navItem_5"]
+    m.bgNodes = []
+    for each id in m.itemIds
+        m.bgNodes.push(m.top.findNode(id + "_bg"))
+    end for
+
+    m.top.observeField("focusedChild", "onFocusChanged")
+    updateHighlight()
+end sub
+
+sub onFocusChanged()
+    updateHighlight()
+end sub
+
+sub onFocusedIndexChange()
+    updateHighlight()
+end sub
+
+sub refreshHighlight()
+    updateHighlight()
+end sub
+
+sub updateHighlight()
+    for i = 0 to m.bgNodes.count() - 1
+        if i = m.top.focusedIndex and m.top.isInFocusChain()
+            m.bgNodes[i].color = ColorPalette.PRIMARY_85
+        else
+            m.bgNodes[i].color = ColorPalette.TRANSPARENT
+        end if
+    end for
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if isStringEqual(key, KeyCode.DOWN)
+        if m.top.focusedIndex < m.itemIds.count() - 1
+            m.top.focusedIndex = m.top.focusedIndex + 1
+        end if
+        return true
+    end if
+
+    if isStringEqual(key, KeyCode.UP)
+        if m.top.focusedIndex > 0
+            m.top.focusedIndex = m.top.focusedIndex - 1
+        end if
+        return true
+    end if
+
+    if isStringEqual(key, KeyCode.OK)
+        m.top.itemSelected = m.top.focusedIndex
+        return true
+    end if
+
+    return false
+end function

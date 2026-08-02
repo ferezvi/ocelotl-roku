@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="OcelotlSidebar" extends="Group">
+    <children>
+        <LayoutGroup id="itemsLayout" translation="[32, 150]" layoutDirection="vert" itemSpacings="[16]">
+            <Group id="navItem_0">
+                <Rectangle id="navItem_0_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_0_label" text="Inicio" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+            <Group id="navItem_1">
+                <Rectangle id="navItem_1_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_1_label" text="Películas" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+            <Group id="navItem_2">
+                <Rectangle id="navItem_2_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_2_label" text="Series" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+            <Group id="navItem_3">
+                <Rectangle id="navItem_3_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_3_label" text="Música" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+            <Group id="navItem_4">
+                <Rectangle id="navItem_4_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_4_label" text="TV en vivo" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+            <Group id="navItem_5">
+                <Rectangle id="navItem_5_bg" width="200" height="64" color="#00000000" />
+                <Label id="navItem_5_label" text="Más" translation="[20, 22]" font="font:MediumSystemFont" color="#FFFFFF" />
+            </Group>
+        </LayoutGroup>
+    </children>
+    <interface>
+        <field id="focusedIndex" type="integer" value="0" alwaysNotify="true" onChange="onFocusedIndexChange" />
+        <field id="itemSelected" type="integer" alwaysNotify="true" />
+        <function name="refreshHighlight" />
+    </interface>
+</component>

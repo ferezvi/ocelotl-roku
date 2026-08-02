@@ -782,16 +782,16 @@ function isFavoriteSectionTitle(sectionTitle as dynamic) as boolean
     if not isValid(sectionTitle) then return false
 
     searchSectionTitle = normalizeSectionTitle(sectionTitle)
-    favoritesTitle = tr("Favorites").Replace(" ", String.EMPTY)
-    favoriteTitlePrefix = tr("Favorite").Replace(" ", String.EMPTY)
+    favoritesTitle = tr("Favorites").Replace(" ", string.EMPTY)
+    favoriteTitlePrefix = tr("Favorite").Replace(" ", string.EMPTY)
 
     return isStringEqual(searchSectionTitle, favoritesTitle) or searchSectionTitle.StartsWith(favoriteTitlePrefix)
 end function
 
 function normalizeSectionTitle(sectionTitle as dynamic) as string
-    if not isValid(sectionTitle) then return String.EMPTY
+    if not isValid(sectionTitle) then return string.EMPTY
 
-    return sectionTitle.Replace(" ", String.EMPTY)
+    return sectionTitle.Replace(" ", string.EMPTY)
 end function
 
 function favoriteSectionExists() as boolean

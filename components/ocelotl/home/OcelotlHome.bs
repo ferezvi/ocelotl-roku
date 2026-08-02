@@ -1,0 +1,125 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.top.overhangVisible = false
+    m.top.overhangTitle = ""
+    m.top.optionsAvailable = false
+
+    m.homeRows = m.top.findNode("homeRows")
+    m.sidebar = m.top.findNode("sidebar")
+    m.topBar = m.top.findNode("topBar")
+
+    ' "sidebar" | "topbar" | "content"
+    m.zone = "sidebar"
+    m.homeRows.observeField("focusedChild", "onHomeRowsFocusChange")
+end sub
+
+sub onHomeRowsFocusChange()
+    if m.homeRows.hasFocus()
+        m.zone = "content"
+    end if
+end sub
+
+sub refresh()
+    m.homeRows.callFunc("updateHomeRows")
+    if isStringEqual(m.zone, "sidebar")
+        m.sidebar.setFocus(true)
+    end if
+end sub
+
+sub loadLibraries()
+    m.homeRows.callFunc("loadLibraries")
+end sub
+
+sub OnScreenShown()
+    if isValid(m.top.lastFocus)
+        m.top.lastFocus.setFocus(true)
+        return
+    end if
+
+    m.zone = "sidebar"
+    m.sidebar.setFocus(true)
+    setLastFocus(m.sidebar)
+end sub
+
+sub OnScreenHidden()
+end sub
+
+sub setLastFocus(node)
+    group = m.global.sceneManager.callFunc("getActiveScene")
+    if isValid(group)
+        group.lastFocus = node
+    end if
+end sub
+
+sub onRowFocusedChange()
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if isStringEqual(m.zone, "sidebar")
+        if isStringEqual(key, KeyCode.RIGHT)
+            m.zone = "content"
+            m.homeRows.setFocus(true)
+            setLastFocus(m.homeRows)
+            m.sidebar.callFunc("refreshHighlight")
+            return true
+        end if
+        return false ' UP/DOWN/OK los maneja OcelotlSidebar internamente
+    end if
+
+    if isStringEqual(m.zone, "content")
+
+        if isStringEqual(key, KeyCode.BACK)
+            m.zone = "sidebar"
+            m.sidebar.setFocus(true)
+            setLastFocus(m.sidebar)
+            m.sidebar.callFunc("refreshHighlight")
+            return true
+        end if
+
+        if isStringEqual(key, KeyCode.LEFT)
+            rowItemFocused = chainLookupReturn(m.homeRows, "rowItemFocused", [0, 0])
+            if isNumber(rowItemFocused[1]) and rowItemFocused[1] = 0
+                m.zone = "sidebar"
+                m.sidebar.setFocus(true)
+                setLastFocus(m.sidebar)
+                m.sidebar.callFunc("refreshHighlight")
+                return true
+            end if
+        end if
+
+        if isStringEqual(key, KeyCode.UP)
+            m.zone = "topbar"
+            m.topBar.setFocus(true)
+            setLastFocus(m.topBar)
+            m.topBar.callFunc("refreshHighlight")
+            return true
+        end if
+
+        return false
+    end if
+
+    if isStringEqual(m.zone, "topbar")
+
+        if isStringEqual(key, KeyCode.BACK)
+            m.zone = "content"
+            m.homeRows.setFocus(true)
+            setLastFocus(m.homeRows)
+            return true
+        end if
+
+        if isStringEqual(key, KeyCode.DOWN)
+            m.zone = "content"
+            m.homeRows.setFocus(true)
+            setLastFocus(m.homeRows)
+            return true
+        end if
+
+        return false
+    end if
+
+    return false
+end function
