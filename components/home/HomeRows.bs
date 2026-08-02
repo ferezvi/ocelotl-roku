@@ -153,6 +153,8 @@ sub onLibrariesLoaded()
     m.LoadLibrariesTask.unobserveField("content")
     m.LoadLibrariesTask.content = []
 
+    m.top.libraries = m.libraryData ' expose to OcelotlHome / sidebar
+
     processUserSections()
 end sub
 

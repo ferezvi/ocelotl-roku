@@ -1,17 +1,94 @@
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/SidebarLayout.bs"
 import "pkg:/source/utils/misc.bs"
 
 sub init()
-    m.itemIds = ["navItem_0", "navItem_1", "navItem_2", "navItem_3", "navItem_4", "navItem_5"]
-    m.bgNodes = []
-    for each id in m.itemIds
-        m.bgNodes.push(m.top.findNode(id + "_bg"))
-    end for
+    m.itemsLayout = m.top.findNode("itemsLayout")
+    m.itemNodes = []
+    m.itemIds = []
+    m.moreExpanded = false
+
+    buildItems()
 
     m.top.observeField("focusedChild", "onFocusChanged")
+    m.top.observeField("libraries", "onLibrariesChange")
+end sub
+
+sub onLibrariesChange()
+    m.moreExpanded = false ' reset in case the library list changed
+    buildItems()
+end sub
+
+sub buildItems()
+    m.itemsLayout.removeChildrenIndex(m.itemsLayout.getChildCount(), 0)
+    m.itemNodes = []
+    m.itemIds = []
+
+    addSidebarItem("home", "pkg:/images/ocelotl/icons/house.png", tr("Home"))
+
+    libs = m.top.libraries
+    pinnedCount = 0
+    if isValidAndNotEmpty(libs)
+        pinnedCount = SidebarLayout.PINNED_LIBRARY_COUNT
+        if libs.count() < pinnedCount then pinnedCount = libs.count()
+
+        for i = 0 to pinnedCount - 1
+            addSidebarItem(libs[i].id, getLibraryIconUri(libs[i].collectionType), libs[i].name)
+        end for
+    end if
+
+    hasOverflow = isValidAndNotEmpty(libs) and libs.count() > pinnedCount
+    if hasOverflow
+        addSidebarItem("more", "pkg:/images/ocelotl/icons/ellipsis.png", tr("More"))
+
+        if m.moreExpanded
+            for i = pinnedCount to libs.count() - 1
+                addSidebarItem(libs[i].id, getLibraryIconUri(libs[i].collectionType), libs[i].name)
+            end for
+        end if
+    end if
+
+    addDivider()
+    addSidebarItem("settings", "pkg:/images/ocelotl/icons/settings.png", tr("Settings"))
+
     updateHighlight()
 end sub
+
+sub addSidebarItem(id as string, iconUri as string, labelText as string)
+    item = m.itemsLayout.createChild("OcelotlSidebarItem")
+    item.iconUri = iconUri
+    item.labelText = labelText
+
+    m.itemNodes.push(item)
+    m.itemIds.push(id)
+end sub
+
+' Thin separator between nav items and the settings entry
+sub addDivider()
+    line = m.itemsLayout.createChild("Rectangle")
+    line.width = SidebarLayout.COLLAPSED_WIDTH
+    line.height = 1
+    line.color = "#FFFFFF33"
+end sub
+
+function getLibraryIconUri(collectionType as string) as string
+    ct = LCase(collectionType ?? "")
+
+    if ct = "movies"
+        return "pkg:/images/ocelotl/icons/clapperboard.png"
+    else if ct = "tvshows"
+        return "pkg:/images/ocelotl/icons/tv.png"
+    else if ct = "music"
+        return "pkg:/images/ocelotl/icons/music.png"
+    else if ct = "livetv"
+        return "pkg:/images/ocelotl/icons/radio.png"
+    else if ct = "boxsets"
+        return "pkg:/images/ocelotl/icons/collections.png"
+    else
+        return "pkg:/images/ocelotl/icons/ellipsis.png"
+    end if
+end function
 
 sub onFocusChanged()
     updateHighlight()
@@ -26,13 +103,11 @@ sub refreshHighlight()
 end sub
 
 sub updateHighlight()
-    for i = 0 to m.bgNodes.count() - 1
-        if i = m.top.focusedIndex and m.top.isInFocusChain()
-            m.bgNodes[i].color = ColorPalette.PRIMARY_85
-        else
-            m.bgNodes[i].color = ColorPalette.TRANSPARENT
-        end if
+    for i = 0 to m.itemNodes.count() - 1
+        m.itemNodes[i].itemFocused = (i = m.top.focusedIndex and m.top.isInFocusChain())
     end for
+
+    m.top.expanded = m.top.isInFocusChain()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -52,7 +127,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
-    if isStringEqual(key, KeyCode.OK)
+    if key = KeyCode.OK
+        selectedId = m.itemIds[m.top.focusedIndex]
+
+        if isStringEqual(selectedId, "more")
+            m.moreExpanded = not m.moreExpanded
+            buildItems()
+            m.itemNodes[m.top.focusedIndex].setFocus(true) ' keep focus on "Más" after rebuild
+            return true
+        end if
+
         m.top.itemSelected = m.top.focusedIndex
         return true
     end if

@@ -1,0 +1,12 @@
+<component name="OcelotlSidebarItem" extends="Group">
+    <interface>
+        <field id="iconUri" type="string" onChange="onIconUriChange" />
+        <field id="labelText" type="string" onChange="onLabelTextChange" />
+        <field id="itemFocused" type="boolean" value="false" onChange="onItemFocusedChange" />
+    </interface>
+    <children>
+        <Poster id="bg" uri="pkg:/images/white.9.png" blendColor="#00000000" />
+        <Poster id="icon" />
+        <Label id="label" font="font:MediumSystemFont" color="#FFFFFF" opacity="0" vertAlign="center" />
+    </children>
+</component>

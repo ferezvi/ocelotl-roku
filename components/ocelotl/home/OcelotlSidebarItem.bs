@@ -1,0 +1,38 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/enums/SidebarLayout.bs"
+
+sub init()
+    m.bg = m.top.findNode("bg")
+    m.icon = m.top.findNode("icon")
+    m.label = m.top.findNode("label")
+
+    m.bg.height = SidebarLayout.ITEM_HEIGHT
+    m.bg.width = SidebarLayout.COLLAPSED_WIDTH
+
+    m.icon.width = SidebarLayout.ICON_SIZE
+    m.icon.height = SidebarLayout.ICON_SIZE
+    m.icon.translation = [SidebarLayout.PADDING_X, (SidebarLayout.ITEM_HEIGHT - SidebarLayout.ICON_SIZE) / 2]
+
+    m.label.height = SidebarLayout.ITEM_HEIGHT
+    m.label.translation = [SidebarLayout.PADDING_X + SidebarLayout.ICON_SIZE + SidebarLayout.ICON_LABEL_GAP, 0]
+end sub
+
+sub onIconUriChange()
+    m.icon.uri = m.top.iconUri
+end sub
+
+sub onLabelTextChange()
+    m.label.text = m.top.labelText
+end sub
+
+sub onItemFocusedChange()
+    if m.top.itemFocused
+        m.bg.width = SidebarLayout.EXPANDED_WIDTH
+        m.bg.blendColor = ColorPalette.PRIMARY_85
+        m.label.opacity = 1
+    else
+        m.bg.width = SidebarLayout.COLLAPSED_WIDTH
+        m.bg.blendColor = ColorPalette.TRANSPARENT
+        m.label.opacity = 0
+    end if
+end sub

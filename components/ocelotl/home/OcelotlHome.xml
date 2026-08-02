@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="OcelotlHome" extends="JFScreen">
     <children>
-        <Rectangle id="background" width="1920" height="1080" color="#0E0323FF" />
-
         <OcelotlTopBar id="topBar" translation="[0, 0]" />
         <OcelotlSidebar id="sidebar" translation="[0, 0]" />
 
         <HomeRows
             id="homeRows"
-            translation="[300, 140]"
+            translation="[112, 140]"
             showRowLabel="true"
             vertFocusAnimationStyle="fixedFocus"
             rowFocusAnimationStyle="fixedFocus"
@@ -17,6 +15,9 @@
             rowLabelOffset="[[0,20]]" />
 
         <OptionsSlider id="options" visible="false" />
+        <Animation id="sidebarPushAnimation" duration="0.2" easeFunction="inOutCubic">
+            <Vector2DFieldInterpolator id="sidebarPushInterpolator" key="[0.0, 1.0]" keyValue="[[300, 140], [300, 140]]" fieldToInterp="homeRows.translation" />
+        </Animation>
     </children>
     <interface>
         <field id="playlistData" type="array" />

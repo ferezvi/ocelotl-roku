@@ -1,5 +1,8 @@
 import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/SidebarLayout.bs"
 import "pkg:/source/utils/misc.bs"
+
+const SIDEBAR_ANIMATION_DURATION = 0.2
 
 sub init()
     m.top.overhangVisible = false
@@ -10,9 +13,30 @@ sub init()
     m.sidebar = m.top.findNode("sidebar")
     m.topBar = m.top.findNode("topBar")
 
+    m.pushAnimation = m.top.findNode("sidebarPushAnimation")
+    m.pushInterpolator = m.top.findNode("sidebarPushInterpolator")
+
     ' "sidebar" | "topbar" | "content"
-    m.zone = "sidebar"
+    m.zone = "content"
     m.homeRows.observeField("focusedChild", "onHomeRowsFocusChange")
+    m.sidebar.observeField("expanded", "onSidebarExpandedChange")
+    m.homeRows.observeField("libraries", "onLibrariesChanged")
+end sub
+
+sub onLibrariesChanged()
+    m.sidebar.libraries = m.homeRows.libraries
+end sub
+
+sub onSidebarExpandedChange()
+    fromPos = m.homeRows.translation
+    collapsedX = SidebarLayout.SCREEN_MARGIN + SidebarLayout.COLLAPSED_WIDTH + SidebarLayout.CONTENT_MARGIN
+    toX = collapsedX
+    if m.sidebar.expanded
+        toX = collapsedX + (SidebarLayout.EXPANDED_WIDTH - SidebarLayout.COLLAPSED_WIDTH)
+    end if
+
+    m.pushInterpolator.keyValue = [fromPos, [toX, 140]]
+    m.pushAnimation.control = "start"
 end sub
 
 sub onHomeRowsFocusChange()
@@ -38,9 +62,9 @@ sub OnScreenShown()
         return
     end if
 
-    m.zone = "sidebar"
-    m.sidebar.setFocus(true)
-    setLastFocus(m.sidebar)
+    m.zone = "content"
+    m.homeRows.setFocus(true)
+    setLastFocus(m.homeRows)
 end sub
 
 sub OnScreenHidden()

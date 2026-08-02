@@ -1,0 +1,13 @@
+enum SidebarLayout
+    ITEM_HEIGHT = 64
+    ITEM_SPACING = 16
+    ICON_SIZE = 32
+    COLLAPSED_WIDTH = 48 ' matches the left margin before the "OCELOTL" wordmark in TopBar
+    EXPANDED_WIDTH = 270
+    PADDING_X = 8 ' (COLLAPSED_WIDTH - ICON_SIZE) / 2, centers icon horizontally
+    ICON_LABEL_GAP = 16
+    HOMEROWS_X_COLLAPSED = 300
+    CONTENT_MARGIN = 40 ' gap between sidebar and homeRows, independent of sidebar width
+    SCREEN_MARGIN = 24 ' left margin between screen edge and the sidebar itself
+    PINNED_LIBRARY_COUNT = 4
+end enum
