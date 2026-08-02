@@ -4,9 +4,14 @@
         <Label id="logo" text="OCELOTL" translation="[48, 24]" font="font:LargeSystemFont" color="#FFFFFF" />
 
         <Poster id="searchIcon" translation="[1580, 40]" width="48" height="48" uri="pkg:/images/icons/search-light.png" />
-        <Poster id="settingsIcon" translation="[1660, 40]" width="48" height="48" uri="pkg:/images/icons/settings.png" />
-        <Label id="clock" text="" translation="[1770, 40]" font="font:MediumSystemFont" color="#FFFFFF" />
 
+        <MaskGroup id="avatarMask" maskUri="pkg:/images/icons/circle66.png" maskSize="[66,66]" translation="[1660, 24]">
+            <Poster uri="pkg:/images/baseline_person_white_48dp.png" id="avatarImage" width="66" height="66" loadDisplayMode="scaleToZoom" />
+        </MaskGroup>
+
+        <Poster id="avatarFocusRing" uri="pkg:/images/icons/openCircle72.png" translation="[1657, 21]" width="72" height="72" visible="false" />
+
+        <Label id="clock" text="" translation="[1770, 40]" font="font:MediumSystemFont" color="#FFFFFF" />
         <Timer id="clockTimer" repeat="true" duration="30" control="start" />
     </children>
     <interface>
@@ -14,4 +19,5 @@
         <field id="itemSelected" type="integer" alwaysNotify="true" />
         <function name="refreshHighlight" />
     </interface>
+    <script type="text/brightscript" uri="pkg:/source/api/Image.bs" />
 </component>
