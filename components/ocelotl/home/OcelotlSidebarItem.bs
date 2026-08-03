@@ -3,8 +3,17 @@ import "pkg:/source/enums/SidebarLayout.bs"
 
 sub init()
     m.bg = m.top.findNode("bg")
+    m.content = m.top.findNode("content")
     m.icon = m.top.findNode("icon")
     m.label = m.top.findNode("label")
+    m.itemScaleInterp = m.top.findNode("itemScaleInterp")
+    m.itemScaleAnimation = m.top.findNode("itemScaleAnimation")
+
+    ' Fixed footprint (widest possible state) so itemsLayout never
+    ' reflows regardless of internal expand/collapse or scale pop
+    m.top.width = SidebarLayout.EXPANDED_WIDTH
+    m.top.height = SidebarLayout.ITEM_HEIGHT
+    m.top.color = "0x00000000"
 
     m.bg.height = SidebarLayout.ITEM_HEIGHT
     m.bg.width = SidebarLayout.COLLAPSED_WIDTH
@@ -15,6 +24,8 @@ sub init()
 
     m.label.height = SidebarLayout.ITEM_HEIGHT
     m.label.translation = [SidebarLayout.PADDING_X + SidebarLayout.ICON_SIZE + SidebarLayout.ICON_LABEL_GAP, 0]
+
+    m.content.scaleRotateCenter = [SidebarLayout.PADDING_X + SidebarLayout.ICON_SIZE / 2, SidebarLayout.ITEM_HEIGHT / 2]
 end sub
 
 sub onIconUriChange()
@@ -25,14 +36,14 @@ sub onLabelTextChange()
     m.label.text = m.top.labelText
 end sub
 
+sub onExpandedChange()
+    m.bg.width = m.top.expanded ? SidebarLayout.EXPANDED_WIDTH : SidebarLayout.COLLAPSED_WIDTH
+    m.label.opacity = m.top.expanded ? 1 : 0
+end sub
+
 sub onItemFocusedChange()
-    if m.top.itemFocused
-        m.bg.width = SidebarLayout.EXPANDED_WIDTH
-        m.bg.blendColor = ColorPalette.PRIMARY_85
-        m.label.opacity = 1
-    else
-        m.bg.width = SidebarLayout.COLLAPSED_WIDTH
-        m.bg.blendColor = ColorPalette.TRANSPARENT
-        m.label.opacity = 0
-    end if
+    m.bg.blendColor = m.top.itemFocused ? ColorPalette.PRIMARY_85 : ColorPalette.TRANSPARENT
+
+    m.itemScaleInterp.reverse = not m.top.itemFocused
+    m.itemScaleAnimation.control = "start"
 end sub

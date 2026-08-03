@@ -1,12 +1,18 @@
-<component name="OcelotlSidebarItem" extends="Group">
+<component name="OcelotlSidebarItem" extends="Rectangle" color="0x00000000">
     <interface>
         <field id="iconUri" type="string" onChange="onIconUriChange" />
         <field id="labelText" type="string" onChange="onLabelTextChange" />
         <field id="itemFocused" type="boolean" value="false" onChange="onItemFocusedChange" />
+        <field id="expanded" type="boolean" value="false" onChange="onExpandedChange" />
     </interface>
     <children>
         <Poster id="bg" uri="pkg:/images/white.9.png" blendColor="#00000000" />
-        <Poster id="icon" />
-        <Label id="label" font="font:MediumSystemFont" color="#FFFFFF" opacity="0" vertAlign="center" />
+        <Group id="content">
+            <Poster id="icon" />
+            <Label id="label" font="font:MediumSystemFont" color="#FFFFFF" opacity="0" vertAlign="center" />
+        </Group>
+        <Animation id="itemScaleAnimation" duration=".15" repeat="false" easeFunction="outCubic">
+            <Vector2DFieldInterpolator id="itemScaleInterp" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.06, 1.06]]" fieldToInterp="content.scale" />
+        </Animation>
     </children>
 </component>

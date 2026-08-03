@@ -66,6 +66,8 @@ sub init()
     m.toggleButtonsAnimation = m.top.findNode("toggleButtonsAnimation")
     m.buttonsFade = m.top.findNode("buttonsFade")
     m.buttonsMove = m.top.findNode("buttonsMove")
+
+    m.searchButtonScale = m.top.findNode("searchButtonScale")
     m.searchButtonScaleAnimation = m.top.findNode("searchButtonScaleAnimation")
 
     setButtonColors()
@@ -73,7 +75,7 @@ sub init()
 end sub
 
 sub onSearchButtonFocusChange()
-    m.searchButtonScaleAnimation.reverse = not m.searchButton.focus
+    m.searchButtonScale.reverse = not m.searchButton.focus
     m.searchButtonScaleAnimation.control = "start"
 end sub
 

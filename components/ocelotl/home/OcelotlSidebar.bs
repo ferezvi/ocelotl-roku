@@ -103,11 +103,12 @@ sub refreshHighlight()
 end sub
 
 sub updateHighlight()
+    m.top.expanded = m.top.isInFocusChain()
+
     for i = 0 to m.itemNodes.count() - 1
         m.itemNodes[i].itemFocused = (i = m.top.focusedIndex and m.top.isInFocusChain())
+        m.itemNodes[i].expanded = m.top.expanded
     end for
-
-    m.top.expanded = m.top.isInFocusChain()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
