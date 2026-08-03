@@ -4,9 +4,9 @@
         <LayoutGroup id="itemsLayout" translation="[24, 150]" layoutDirection="vert" itemSpacings="[16]" />
     </children>
     <interface>
+        <field id="itemSelected" type="string" alwaysNotify="true" />
         <field id="libraries" type="array" onChange="onLibrariesChange" />
         <field id="focusedIndex" type="integer" value="0" alwaysNotify="true" onChange="onFocusedIndexChange" />
-        <field id="itemSelected" type="integer" alwaysNotify="true" />
         <function name="refreshHighlight" />
         <field id="expanded" type="boolean" value="false" alwaysNotify="true" />
     </interface>

@@ -137,7 +137,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
 
-        m.top.itemSelected = m.top.focusedIndex
+        m.top.itemSelected = selectedId
         return true
     end if
 

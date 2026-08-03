@@ -7,27 +7,17 @@
     <OcelotlSidebar
       id="sidebar"
       translation="[0,0]" />
-    <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
+    <LayoutGroup id="buttons" translation="[860, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
       <TextButton
         id="searchButton"
         iconSide="left"
-        fontSize="25"
-        padding="20"
-        icon="pkg:/images/icons/search-light.png"
-        focusIcon="pkg:/images/icons/search-light.png"
+        fontSize="30"
+        padding="24"
+        icon="pkg:/images/ocelotl/icons/search.png"
+        focusIcon="pkg:/images/ocelotl/icons/search.png"
         text="Search"
-        height="50"
-        width="200" />
-      <TextButton
-        id="settingsButton"
-        iconSide="left"
-        fontSize="25"
-        padding="20"
-        icon="pkg:/images/icons/settings.png"
-        focusIcon="pkg:/images/icons/settings.png"
-        text="Settings"
-        height="50"
-        width="200" />
+        height="60"
+        width="230" />
     </LayoutGroup>
 
     <HomeRows
@@ -42,7 +32,7 @@
 
     <Animation id="toggleButtonsAnimation" duration=".7" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="buttonsFade" key="[0.0, .6]" keyValue="[1.00, 0.00]" fieldToInterp="buttons.opacity" />
-      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[100, 100], [100, 0]]" fieldToInterp="buttons.translation" />
+      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[860, 100], [860, 0]]" fieldToInterp="buttons.translation" />
     </Animation>
     <Animation id="backdropCrossfadeAnimation" duration=".5" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="backdropAFade" key="[0.0, 1.0]" keyValue="[0.00, 1.00]" fieldToInterp="backdropA.opacity" />
