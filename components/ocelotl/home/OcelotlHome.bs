@@ -66,8 +66,15 @@ sub init()
     m.toggleButtonsAnimation = m.top.findNode("toggleButtonsAnimation")
     m.buttonsFade = m.top.findNode("buttonsFade")
     m.buttonsMove = m.top.findNode("buttonsMove")
+    m.searchButtonScaleAnimation = m.top.findNode("searchButtonScaleAnimation")
 
     setButtonColors()
+    m.searchButton.observeField("focus", "onSearchButtonFocusChange")
+end sub
+
+sub onSearchButtonFocusChange()
+    m.searchButtonScaleAnimation.reverse = not m.searchButton.focus
+    m.searchButtonScaleAnimation.control = "start"
 end sub
 
 sub onSidebarExpandedChange()

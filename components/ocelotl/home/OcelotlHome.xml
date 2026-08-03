@@ -17,7 +17,8 @@
         focusIcon="pkg:/images/ocelotl/icons/search.png"
         text="Search"
         height="60"
-        width="230" />
+        width="230"
+        scaleRotateCenter="[115, 30]" />
     </LayoutGroup>
 
     <HomeRows
@@ -45,6 +46,9 @@
         key="[0.0,1.0]"
         keyValue="[[150,140],[150,140]]"
         fieldToInterp="homeRows.translation" />
+    </Animation>
+    <Animation id="searchButtonScaleAnimation" duration=".15" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="searchButtonScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.1, 1.1]]" fieldToInterp="searchButton.scale" />
     </Animation>
   </children>
   <interface>
