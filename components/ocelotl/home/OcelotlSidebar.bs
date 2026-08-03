@@ -81,10 +81,18 @@ function getLibraryIconUri(collectionType as string) as string
         return "pkg:/images/ocelotl/icons/tv.png"
     else if ct = "music"
         return "pkg:/images/ocelotl/icons/music.png"
+    else if ct = "musicvideos"
+        return "pkg:/images/ocelotl/icons/video.png"
+    else if ct = "homevideos"
+        return "pkg:/images/ocelotl/icons/images.png"
+    else if ct = "books"
+        return "pkg:/images/ocelotl/icons/book-open.png"
     else if ct = "livetv"
         return "pkg:/images/ocelotl/icons/radio.png"
     else if ct = "boxsets"
         return "pkg:/images/ocelotl/icons/collections.png"
+    else if ct = "playlists"
+        return "pkg:/images/ocelotl/icons/list-music.png"
     else
         return "pkg:/images/ocelotl/icons/ellipsis.png"
     end if

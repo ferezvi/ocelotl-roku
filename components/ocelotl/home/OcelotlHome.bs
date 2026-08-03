@@ -647,6 +647,14 @@ end sub
 sub onSidebarItemSelected()
     selectedId = m.sidebar.itemSelected
 
+    ' "Home" just returns focus to the content zone, no navigation needed
+    if isStringEqual(selectedId, "home")
+        m.zone = "content"
+        m.homeRows.setFocus(true)
+        setLastFocus(m.homeRows)
+        return
+    end if
+
     if isStringEqual(selectedId, "settings")
         m.top.getScene().jumpTo = {
             selectionType: "settings"
@@ -654,6 +662,12 @@ sub onSidebarItemSelected()
         return
     end if
 
-    ' TODO: "home" and library ids aren't wired up yet either -
-    ' out of scope for this change, flagging for follow-up
+    ' Library items: delegate to the global selectedItem flow (onLibrarySelection
+    ' in MainEventHandlers.bs), same path a home row library tile uses
+    for each library in m.homeRows.libraries
+        if isStringEqual(library.id, selectedId)
+            m.top.selectedItem = library
+            return
+        end if
+    end for
 end sub
