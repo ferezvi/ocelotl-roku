@@ -1,7 +1,7 @@
 {
   "name": "ocelotl",
   "type": "module",
-  "version": "0.1.0",
+  "version": "3.2.3",
   "description": "Ocelotl media client for Roku, based on Jellyfin Roku",
   "dependencies": {
     "@rokucommunity/bslib": "0.1.1",
