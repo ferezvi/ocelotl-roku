@@ -1,30 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="OcelotlHome" extends="JFScreen">
-    <children>
-        <OcelotlTopBar id="topBar" translation="[0, 0]" />
-        <OcelotlSidebar id="sidebar" translation="[0, 0]" />
+  <children>
+    <Poster id="backdropA" loadDisplayMode="scaleToZoom" width="1920" height="1080" opacity="0" />
+    <Poster id="backdropB" loadDisplayMode="scaleToZoom" width="1920" height="1080" opacity="0" />
+    <Rectangle id="backdropOverlay" width="1920" height="1080" opacity="0" />
+    <OcelotlSidebar
+      id="sidebar"
+      translation="[0,0]" />
+    <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
+      <TextButton
+        id="searchButton"
+        iconSide="left"
+        fontSize="25"
+        padding="20"
+        icon="pkg:/images/icons/search-light.png"
+        focusIcon="pkg:/images/icons/search-light.png"
+        text="Search"
+        height="50"
+        width="200" />
+      <TextButton
+        id="settingsButton"
+        iconSide="left"
+        fontSize="25"
+        padding="20"
+        icon="pkg:/images/icons/settings.png"
+        focusIcon="pkg:/images/icons/settings.png"
+        text="Settings"
+        height="50"
+        width="200" />
+    </LayoutGroup>
 
-        <HomeRows
-            id="homeRows"
-            translation="[112, 140]"
-            showRowLabel="true"
-            vertFocusAnimationStyle="fixedFocus"
-            rowFocusAnimationStyle="fixedFocus"
-            itemComponentName="HomeItem"
-            numRows="2"
-            rowLabelOffset="[[0,20]]" />
+    <HomeRows
+      id="homeRows"
+      showRowLabel="true"
+      vertFocusAnimationStyle="fixedFocus"
+      rowFocusAnimationStyle="fixedFocus"
+      itemComponentName="HomeItem"
+      numRows="2"
+      rowLabelOffset="[[0,20]]" />
+    <OptionsSlider id="options" />
 
-        <OptionsSlider id="options" visible="false" />
-        <Animation id="sidebarPushAnimation" duration="0.2" easeFunction="inOutCubic">
-            <Vector2DFieldInterpolator id="sidebarPushInterpolator" key="[0.0, 1.0]" keyValue="[[300, 140], [300, 140]]" fieldToInterp="homeRows.translation" />
-        </Animation>
-    </children>
-    <interface>
-        <field id="playlistData" type="array" />
-        <field id="selectedItem" alias="homeRows.selectedItem" />
-        <field id="rowFocused" alias="homeRows.itemFocused" onchange="onRowFocusedChange" />
-        <field id="quickPlayNode" alias="homeRows.quickPlayNode" />
-        <function name="refresh" />
-        <function name="loadLibraries" />
-    </interface>
+    <Animation id="toggleButtonsAnimation" duration=".7" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="buttonsFade" key="[0.0, .6]" keyValue="[1.00, 0.00]" fieldToInterp="buttons.opacity" />
+      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[100, 100], [100, 0]]" fieldToInterp="buttons.translation" />
+    </Animation>
+    <Animation id="backdropCrossfadeAnimation" duration=".5" repeat="false" easeFunction="linear">
+      <FloatFieldInterpolator id="backdropAFade" key="[0.0, 1.0]" keyValue="[0.00, 1.00]" fieldToInterp="backdropA.opacity" />
+      <FloatFieldInterpolator id="backdropBFade" key="[0.0, 1.0]" keyValue="[0.00, 1.00]" fieldToInterp="backdropB.opacity" />
+      <FloatFieldInterpolator id="backdropOverlayFade" key="[0.0, 1.0]" keyValue="[0.00, 1.00]" fieldToInterp="backdropOverlay.opacity" />
+    </Animation>
+    <Animation id="sidebarPushAnimation" duration=".2" repeat="false" easeFunction="linear">
+      <Vector2DFieldInterpolator
+        id="sidebarPushInterpolator"
+        key="[0.0,1.0]"
+        keyValue="[[150,140],[150,140]]"
+        fieldToInterp="homeRows.translation" />
+    </Animation>
+  </children>
+  <interface>
+    <field id="playlistData" type="array" />
+    <field id="selectedItem" alias="homeRows.selectedItem" />
+    <field id="rowFocused" alias="homeRows.itemFocused" onchange="onRowFocusedChange" />
+    <field id="quickPlayNode" alias="homeRows.quickPlayNode" />
+    <function name="refresh" />
+    <function name="loadLibraries" />
+    <field id="homeItemFocused" alias="homeRows.rowItemFocused" onchange="onHomeItemFocusedChange" />
+  </interface>
 </component>
