@@ -26,7 +26,8 @@ sub init()
     m.fontColor = CreateObject("roRegex", "color\s*=\s*(""[^""]*""|\'[^\']*\'|[^\s]+)", "i")
 
     ' Caption Style
-    m.fontSizeDict = { "Default": 46, "Medium": 46, "Large": 54, "Extra Large": 62, "Small": 38, "Extra Small": 30 } m.percentageDict = { "Default": "FF", "100%": "FF", "75%": "BF", "50%": "7F", "25%": "4B", "Off": "00" }
+    m.fontSizeDict = { "Default": 46, "Medium": 46, "Large": 54, "Extra Large": 62, "Small": 38, "Extra Small": 30 }
+    m.percentageDict = { "Default": "FF", "100%": "FF", "75%": "BF", "50%": "7F", "25%": "4B", "Off": "00" }
     m.textColorDict = { "Default": "0xCCCCCC", "Bright White": "0xFFFFFF", "White": "0xCCCCCC", "Black": "0x000000", "Red": "0xFF0000", "Green": "0x008000", "Blue": "0x0000FF", "Yellow": "0xFFFF00", "Magenta": "0xFF00FF", "Cyan": "0x00FFFF" }
     m.bgColorDict = { "Default": "0x000000", "Bright White": "0xFFFFFF", "White": "0xCCCCCC", "Black": "0x000000", "Red": "0xFF0000", "Green": "0x008000", "Blue": "0x0000FF", "Yellow": "0xFFFF00", "Magenta": "0xFF00FF", "Cyan": "0x00FFFF" }
 

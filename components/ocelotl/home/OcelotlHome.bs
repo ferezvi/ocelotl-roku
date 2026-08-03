@@ -572,17 +572,30 @@ function onKeyEvent(key as string, press as boolean) as boolean
         end if
 
 
-        ' Move back to the first item in the current row
+        ' Back navigation
         if isStringEqual(key, KeyCode.BACK)
 
             rowItemFocused = chainLookupReturn(m.homeRows, "rowItemFocused", [0, 0])
 
             if isNumber(rowItemFocused[1])
 
+                ' If we're not at the first item, jump to it
                 if rowItemFocused[1] > 0
                     m.homeRows.jumpToRowItem = [rowItemFocused[0], 0]
                     return true
                 end if
+
+                ' If we're already at the first item, open the sidebar
+                m.zone = "sidebar"
+
+                ' Clear backdrop immediately when opening sidebar
+                setBackdropImage("")
+
+                m.sidebar.setFocus(true)
+                setLastFocus(m.sidebar)
+                m.sidebar.callFunc("refreshHighlight")
+
+                return true
 
             end if
 
