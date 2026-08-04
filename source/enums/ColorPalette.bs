@@ -5,7 +5,7 @@ enum ColorPalette
     BLACKDD = "0x000000DD"
     DARKGREY = "#101010"
     ELEMENTBACKGROUND = "#101420"
-    HIGHLIGHT = "0xff6867FF"
+    HIGHLIGHT = "#7C3AED"
     LIGHTBLUE = "#c8fafa"
     LIGHTGREY = "#aaaaaa"
     LIGHTHIGHLIGHT = "#ff9a99"

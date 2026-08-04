@@ -106,10 +106,12 @@ end sub
 
 sub setButtonColors()
     m.searchButton = m.top.findNode("searchButton")
-    m.searchButton.textColor = ColorPalette.WHITE
+
+    m.searchButton.textColor = ColorPalette.TEXT_SECONDARY
     m.searchButton.background = ColorPalette.TRANSPARENT
-    m.searchButton.focusTextColor = ColorPalette.WHITE
-    m.searchButton.focusBackground = ColorPalette.PRIMARY
+
+    m.searchButton.focusTextColor = ColorPalette.TEXT_PRIMARY
+    m.searchButton.focusBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
 end sub
 
 sub loadLibraries()

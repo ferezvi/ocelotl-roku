@@ -1,5 +1,6 @@
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/SidebarLayout.bs"
+import "pkg:/source/utils/misc.bs"
 
 sub init()
     m.bg = m.top.findNode("bg")
@@ -24,7 +25,7 @@ sub init()
 
     m.label.height = SidebarLayout.ITEM_HEIGHT
     m.label.translation = [SidebarLayout.PADDING_X + SidebarLayout.ICON_SIZE + SidebarLayout.ICON_LABEL_GAP, 0]
-
+    m.label.color = chainLookupReturn(m.global.session, "user.settings.colorText", ColorPalette.TEXT_PRIMARY)
     m.content.scaleRotateCenter = [SidebarLayout.PADDING_X + SidebarLayout.ICON_SIZE / 2, SidebarLayout.ITEM_HEIGHT / 2]
 end sub
 
@@ -42,7 +43,15 @@ sub onExpandedChange()
 end sub
 
 sub onItemFocusedChange()
-    m.bg.blendColor = m.top.itemFocused ? ColorPalette.PRIMARY_85 : ColorPalette.TRANSPARENT
+    if m.top.itemFocused
+        m.bg.blendColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.PRIMARY_85)
+        m.label.color = ColorPalette.TEXT_PRIMARY
+        m.icon.blendColor = ColorPalette.TEXT_PRIMARY
+    else
+        m.bg.blendColor = ColorPalette.TRANSPARENT
+        m.label.color = ColorPalette.TEXT_SECONDARY
+        m.icon.blendColor = ColorPalette.TEXT_SECONDARY
+    end if
 
     m.itemScaleInterp.reverse = not m.top.itemFocused
     m.itemScaleAnimation.control = "start"

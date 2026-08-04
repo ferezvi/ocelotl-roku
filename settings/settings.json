@@ -493,29 +493,25 @@
                 "title": "Background",
                 "description": "The base background color. Background images are layered on top of this color.",
                 "settingName": "colorBackground",
-                "type": "colorgrid",
-                "default": "#000018"
+                "type": "colorgrid"
               },
               {
                 "title": "Cursor",
                 "description": "The color of the remote control's cursor.",
                 "settingName": "colorCursor",
-                "type": "colorgrid",
-                "default": "#FF6666"
+                "type": "colorgrid"
               },
               {
                 "title": "Primary Text",
                 "description": "The primary text color.",
                 "settingName": "colorText",
-                "type": "colorgrid",
-                "default": "#FFFFFF"
+                "type": "colorgrid"
               },
               {
                 "title": "Secondary Text",
                 "description": "The secondary text color.",
                 "settingName": "colorSubText",
-                "type": "colorgrid",
-                "default": "#777777FF"
+                "type": "colorgrid"
               },
               {
                 "title": "Watched Check Mark & Unplayed Count",
