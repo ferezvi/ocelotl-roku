@@ -4,6 +4,7 @@ sub init()
     m.controls = m.top.findNode("controls")
 
     m.top.observeField("playbackState", "onPlaybackStateChanged")
+    m.controls.observeField("action", "onControlAction")
 
 end sub
 
@@ -14,6 +15,14 @@ sub onPlaybackStateChanged()
 
 end sub
 
+
+sub onControlAction()
+
+    if m.controls.action <> ""
+        m.top.action = m.controls.action
+    end if
+
+end sub
 
 sub show()
 
