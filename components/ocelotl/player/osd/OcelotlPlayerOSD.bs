@@ -13,6 +13,8 @@ sub init()
     m.top.observeField("seasonNumber", "onSeasonNumberChanged")
     m.top.observeField("episodeNumber", "onEpisodeNumberChanged")
     m.top.observeField("episodeNumberEnd", "onEpisodeNumberEndChanged")
+    m.top.observeField("playbackState", "onPlaybackStateChanged")
+    m.controls.observeField("action", "onControlAction")
 
 end sub
 
@@ -25,6 +27,7 @@ sub findNodes()
     m.itemSeason = m.top.findNode("itemSeason")
     m.itemEpisode = m.top.findNode("itemEpisode")
     m.itemEpisodeEnd = m.top.findNode("itemEpisodeEnd")
+    m.controls = m.top.findNode("controls")
 
 end sub
 
@@ -50,7 +53,8 @@ end sub
 
 sub onPlaybackStateChanged()
 
-    print "OcelotlPlayerOSD state: "; m.top.playbackState
+    ' Pass playback state down so PlayerControls can swap play/pause icon
+    m.controls.playbackState = m.top.playbackState
 
 end sub
 
@@ -58,7 +62,7 @@ end sub
 sub onControlAction()
 
     if m.controls.action <> ""
-        m.top.action = m.controls.action
+        m.top.controlAction = m.controls.action
     end if
 
 end sub

@@ -1,4 +1,5 @@
 sub init()
+    print "OCELOTL CONTROLS INIT"
 
     m.content = m.top.findNode("content")
 

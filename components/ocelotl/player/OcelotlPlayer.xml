@@ -9,7 +9,7 @@
 
         <field id="mediaSourceId" type="string" />
         <field id="videoId" type="string" />
-
+        <field id="controlAction" type="string" alwaysNotify="true" />
         <field id="voiceCommand" type="assocarray" alwaysNotify="true" />
 
         <function name="showOSD" />

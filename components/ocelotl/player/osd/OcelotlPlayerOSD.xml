@@ -12,6 +12,7 @@
         <field id="seasonNumber" type="integer" />
         <field id="episodeNumber" type="integer" />
         <field id="episodeNumberEnd" type="integer" />
+        <field id="controlAction" type="string" alwaysNotify="true" />
         <function name="show" />
         <function name="hide" />
     </interface>
@@ -36,13 +37,9 @@
 
         <Clock id="clock" translation="[1600,50]" />
 
-        <Group id="content">
+        <Clock id="clock" translation="[1600,50]" />
 
-            <OcelotlPlayerControls
-                id="controls"
-            />
-
-        </Group>
+        <OcelotlPlayerControls id="controls" />
 
     </children>
 

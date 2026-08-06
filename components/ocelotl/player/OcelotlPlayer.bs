@@ -1,13 +1,16 @@
 import "pkg:/source/enums/ItemType.bs"
+import "pkg:/source/enums/MediaPlaybackState.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/misc.bs"
 
+
 sub init()
 
     m.top.enableUI = false ' Disable Roku's native playback UI - Ocelotl uses its own OSD
     m.top.observeField("state", "onPlayerStateChanged")
+    m.top.observeField("controlAction", "onControlAction")
 
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.currentItem = currentItem
@@ -24,6 +27,7 @@ sub init()
     m.LoadMetaDataTask.control = TaskControl.RUN
 
     m.osd = m.top.findNode("osd")
+    m.osd.observeField("controlAction", "onControlAction")
 
 end sub
 
@@ -123,3 +127,64 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 
 end function
+' onControlAction: Dispatches presses coming from OcelotlPlayerControls
+' (forwarded through the OSD's controlAction field) to actual playback commands.
+'
+sub onControlAction()
+
+    action = m.osd.controlAction
+
+    if action = "videoPlayPause"
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        else
+            m.top.control = VideoControl.RESUME
+        end if
+        return
+    end if
+
+    if action = "chapterBack"
+        ' TODO: replace with real chapter seek once chapter data is wired
+        m.top.seek = m.top.position - 10
+        return
+    end if
+
+    if action = "chapterNext"
+        ' TODO: replace with real chapter seek once chapter data is wired
+        m.top.seek = m.top.position + 10
+        return
+    end if
+
+    if action = "itemNext"
+        if m.global.queueManager.callFunc("getPosition") < m.global.queueManager.callFunc("getCount") - 1
+            m.top.control = VideoControl.STOP
+            m.global.sceneManager.callFunc("clearPreviousScene")
+            m.global.queueManager.callFunc("moveForward")
+            m.global.queueManager.callFunc("playQueue")
+        end if
+        return
+    end if
+
+    if action = "itemBack"
+        if m.global.queueManager.callFunc("getPosition") > 0
+            m.top.control = VideoControl.STOP
+            m.global.sceneManager.callFunc("clearPreviousScene")
+            m.global.queueManager.callFunc("moveBack")
+            m.global.queueManager.callFunc("playQueue")
+        end if
+        return
+    end if
+
+    if action = "showVideoOverviewPopup"
+        ' TODO: overview popup not built yet
+        print "OcelotlPlayer: show overview popup (not implemented)"
+        return
+    end if
+
+    if action = "languageButton"
+        ' TODO: audio/subtitle picker not built yet
+        print "OcelotlPlayer: language picker (not implemented)"
+        return
+    end if
+
+end sub
