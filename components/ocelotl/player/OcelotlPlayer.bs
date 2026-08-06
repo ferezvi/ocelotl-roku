@@ -4,6 +4,17 @@ sub init()
 
     m.osd = m.top.findNode("osd")
 
+    m.top.observeField("state", "onPlayerStateChanged")
+
+end sub
+
+
+sub onPlayerStateChanged()
+
+    if isValid(m.osd)
+        m.osd.playbackState = m.top.state
+    end if
+
 end sub
 
 
