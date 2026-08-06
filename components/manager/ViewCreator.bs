@@ -75,7 +75,7 @@ sub CreateVideoPlayerView()
 
     m.global.queueManager.callFunc("setSelectedAudioStreamIndex", preferredAudioTrackIndex)
 
-    m.view = CreateObject("roSGNode", "VideoPlayerView")
+    m.view = CreateObject("roSGNode", "OcelotlPlayer")
     m.view.observeField("state", "onStateChange")
     m.view.observeField("selectPlaybackInfoPressed", "onSelectPlaybackInfoPressed")
     m.view.observeField("selectSubtitlePressed", "onSelectSubtitlePressed")
@@ -565,7 +565,7 @@ function handleTransportCommand(data as object) as object
         ret.status = TransportStatus.SUCCESS
 
     else if isStringEqual(cmd, TransportCommand.PAUSE) or isStringEqual(cmd, TransportCommand.STOP)
-        ret.cmd = { type: TransportCommand.PAUSE}
+        ret.cmd = { type: TransportCommand.PAUSE }
         ret.status = TransportStatus.SUCCESS
 
     else if isStringEqual(cmd, TransportCommand.PLAYPAUSE)

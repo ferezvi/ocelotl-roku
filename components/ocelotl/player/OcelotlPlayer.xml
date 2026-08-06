@@ -17,18 +17,12 @@
     </interface>
 
     <children>
-
-        <Group
-            id="overlay"
-            width="1920"
-            height="1080"
-        />
+        <Group id="overlay" />
 
         <OcelotlPlayerOSD
             id="osd"
             visible="false"
         />
-
     </children>
 
 </component>

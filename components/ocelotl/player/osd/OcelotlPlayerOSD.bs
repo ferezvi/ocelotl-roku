@@ -1,10 +1,29 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/utils/misc.bs"
+
 sub init()
 
-    m.content = m.top.findNode("content")
-    m.controls = m.top.findNode("controls")
+    findNodes()
+    initFields()
 
-    m.top.observeField("playbackState", "onPlaybackStateChanged")
-    m.controls.observeField("action", "onControlAction")
+end sub
+
+
+sub findNodes()
+
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.subtitleLabel = m.top.findNode("subtitleLabel")
+
+end sub
+
+sub initFields()
+
+    m.titleLabel.text = "Prueba Ocelotl Player"
+    m.subtitleLabel.text = "Subtitulo de prueba"
+
+
+    m.titleLabel.color = chainLookupReturn(m.global.session, "user.settings.colorText", ColorPalette.TEXT_PRIMARY)
+    m.subtitleLabel.color = chainLookupReturn(m.global.session, "user.settings.colorSubText", ColorPalette.TEXT_SECONDARY)
 
 end sub
 

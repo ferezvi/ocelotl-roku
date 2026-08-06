@@ -1,15 +1,47 @@
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/misc.bs"
 
 sub init()
 
-    m.osd = m.top.findNode("osd")
-
     m.top.observeField("state", "onPlayerStateChanged")
 
-    m.osd.observeField("action", "onOSDAction")
+    currentItem = m.global.queueManager.callFunc("getCurrentItem")
+
+    m.LoadMetaDataTask = CreateObject("roSGNode", "LoadVideoContentTask")
+
+    m.LoadMetaDataTask.selectedSubtitleIndex = SubtitleSelection.NOTSET
+    m.LoadMetaDataTask.itemId = currentItem.id
+    m.LoadMetaDataTask.itemType = currentItem.type
+    m.LoadMetaDataTask.selectedAudioStreamIndex = currentItem.selectedAudioStreamIndex
+
+    m.LoadMetaDataTask.observeField("content", "onVideoContentLoaded")
+
+    m.LoadMetaDataTask.control = TaskControl.RUN
+
+    m.osd = m.top.findNode("osd")
 
 end sub
 
+sub onVideoContentLoaded()
+
+    print "OcelotlPlayer content loaded"
+
+    videoContent = m.LoadMetaDataTask.content
+
+    if isValid(videoContent) and videoContent.count() > 0
+
+        m.top.content = videoContent[0].content
+
+        print "OcelotlPlayer PLAY"
+
+        m.top.setFocus(true)
+        m.top.control = VideoControl.PLAY
+
+    end if
+
+end sub
 
 sub onOSDAction()
 
@@ -24,9 +56,7 @@ end sub
 
 sub onPlayerStateChanged()
 
-    if isValid(m.osd)
-        m.osd.playbackState = m.top.state
-    end if
+
 
 end sub
 
@@ -47,3 +77,18 @@ sub hideOSD()
     end if
 
 end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+
+    if press and key = "OK"
+        if m.osd.visible
+            m.osd.visible = false
+        else
+            m.osd.visible = true
+        end if
+        return true
+    end if
+
+    return false
+
+end function

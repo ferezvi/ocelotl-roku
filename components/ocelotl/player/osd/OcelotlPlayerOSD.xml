@@ -13,6 +13,11 @@
 
     <children>
 
+        <Poster id="topGradient" uri="pkg:/images/ocelotl/ui/osd/top_gradient.png" width="1920" height="260" translation="[0,0]" />
+        <Poster id="bottomGradient" uri="pkg:/images/ocelotl/ui/osd/bottom_gradient.png" width="1920" height="300" translation="[0,780]" />
+        <Label id="titleLabel" text="" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" translation="[240,50]" width="1200" height="50" />
+        <Label id="subtitleLabel" text="" font="font:MediumSystemFont" color="0xCCCCCCFF" translation="[240,105]" width="1200" height="40" />
+        <Clock id="clock" translation="[1600,50]" />
         <Group id="content">
 
             <OcelotlPlayerControls
