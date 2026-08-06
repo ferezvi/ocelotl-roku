@@ -1,21 +1,24 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<component name="OcelotlPlayer" extends="Video">
 
-<component name="OcelotlPlayer" extends="Group">
+    <interface>
+        <field id="selectSubtitlePressed" type="boolean" alwaysNotify="true" />
+        <field id="selectAudioPressed" type="boolean" alwaysNotify="true" />
+        <field id="selectSpeedPressed" type="boolean" alwaysNotify="true" />
+        <field id="selectPlaybackInfoPressed" type="boolean" alwaysNotify="true" />
+        <field id="backPressed" type="boolean" alwaysNotify="true" />
+
+        <field id="mediaSourceId" type="string" />
+        <field id="videoId" type="string" />
+
+        <field id="voiceCommand" type="assocarray" alwaysNotify="true" />
+    </interface>
 
     <children>
-
-        <Video
-            id="video"
-            width="1920"
-            height="1080"
-        />
-
         <Group
             id="overlay"
             width="1920"
             height="1080"
         />
-
     </children>
 
 </component>
