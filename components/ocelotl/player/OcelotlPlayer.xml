@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<component name="OcelotlPlayer" extends="Group">
+
+    <children>
+
+        <Video
+            id="video"
+            width="1920"
+            height="1080"
+        />
+
+        <Group
+            id="overlay"
+            width="1920"
+            height="1080"
+        />
+
+    </children>
+
+</component>

@@ -1,0 +1,4 @@
+sub init()
+    m.video = m.top.findNode("video")
+    m.overlay = m.top.findNode("overlay")
+end sub
