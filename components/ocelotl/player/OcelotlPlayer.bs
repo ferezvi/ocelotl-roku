@@ -33,8 +33,9 @@ sub onVideoContentLoaded()
     if isValid(videoContent) and videoContent.count() > 0
 
         m.top.content = videoContent[0].content
-
-        print "OcelotlPlayer PLAY"
+        if isValidAndNotEmpty(videoContent[0].logoImage)
+            m.osd.logoImage = videoContent[0].logoImage
+        end if
 
         m.top.setFocus(true)
         m.top.control = VideoControl.PLAY

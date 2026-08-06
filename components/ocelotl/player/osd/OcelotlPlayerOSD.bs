@@ -1,16 +1,20 @@
 import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/utils/misc.bs"
 
+const LOGO_RIGHT_PADDING = 30
+
 sub init()
 
     findNodes()
     initFields()
+    m.top.observeField("logoImage", "onLogoImageChanged")
 
 end sub
 
 
 sub findNodes()
 
+    m.logoImage = m.top.findNode("logoImage")
     m.titleLabel = m.top.findNode("titleLabel")
     m.subtitleLabel = m.top.findNode("subtitleLabel")
 
@@ -54,4 +58,27 @@ sub hide()
 
     m.top.visible = false
 
+end sub
+
+' onLogoLoadStatusChanged: Handler for changes to logo image's status.
+'
+' @param {dynamic} event - field change event
+sub onLogoLoadStatusChanged(event)
+    if LCase(event.GetData()) = "ready"
+        logoImage = event.getRoSGNode()
+        logoImage.unobserveField("loadStatus")
+    end if
+end sub
+
+' onLogoImageChanged: Handler for changes to m.top.logoImage param.
+'
+sub onLogoImageChanged()
+    if isValidAndNotEmpty(m.top.logoImage)
+        logoImage = createObject("roSGNode", "Poster")
+        logoImage.Id = "logoImage"
+        logoImage.observeField("loadStatus", "onLogoLoadStatusChanged")
+        logoImage.uri = m.top.logoImage
+        logoImage.translation = [103, 61]
+        m.top.appendChild(logoImage)
+    end if
 end sub
