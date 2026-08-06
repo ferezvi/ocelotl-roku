@@ -1,0 +1,5 @@
+sub init()
+
+    m.content = m.top.findNode("content")
+
+end sub
