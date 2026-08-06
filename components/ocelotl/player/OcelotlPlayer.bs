@@ -6,6 +6,19 @@ sub init()
 
     m.top.observeField("state", "onPlayerStateChanged")
 
+    m.osd.observeField("action", "onOSDAction")
+
+end sub
+
+
+sub onOSDAction()
+
+    if m.osd.action = "show"
+        showOSD()
+    else if m.osd.action = "hide"
+        hideOSD()
+    end if
+
 end sub
 
 
