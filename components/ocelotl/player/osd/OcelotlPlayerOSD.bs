@@ -1,5 +1,6 @@
 sub init()
 
     m.content = m.top.findNode("content")
+    m.controls = m.top.findNode("controls")
 
 end sub

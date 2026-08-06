@@ -9,7 +9,13 @@
 
     <children>
 
-        <Group id="content" />
+        <Group id="content">
+
+            <OcelotlPlayerControls
+                id="controls"
+            />
+
+        </Group>
 
     </children>
 
