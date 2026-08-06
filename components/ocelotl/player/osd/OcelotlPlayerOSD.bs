@@ -3,6 +3,15 @@ sub init()
     m.content = m.top.findNode("content")
     m.controls = m.top.findNode("controls")
 
+    m.top.observeField("playbackState", "onPlaybackStateChanged")
+
+end sub
+
+
+sub onPlaybackStateChanged()
+
+    print "OcelotlPlayerOSD state: "; m.top.playbackState
+
 end sub
 
 
