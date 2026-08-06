@@ -5,6 +5,9 @@
     <interface>
         <field id="hasFocus" type="boolean" alwaysNotify="true" />
         <field id="action" type="string" alwaysNotify="true" />
+
+        <function name="show" />
+        <function name="hide" />
     </interface>
 
     <children>

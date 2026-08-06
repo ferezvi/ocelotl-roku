@@ -4,3 +4,17 @@ sub init()
     m.controls = m.top.findNode("controls")
 
 end sub
+
+
+sub show()
+
+    m.top.visible = true
+
+end sub
+
+
+sub hide()
+
+    m.top.visible = false
+
+end sub
