@@ -11,6 +11,9 @@
         <field id="videoId" type="string" />
 
         <field id="voiceCommand" type="assocarray" alwaysNotify="true" />
+
+        <function name="showOSD" />
+        <function name="hideOSD" />
     </interface>
 
     <children>

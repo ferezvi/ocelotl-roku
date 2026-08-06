@@ -1,5 +1,25 @@
+import "pkg:/source/utils/misc.bs"
+
 sub init()
 
     m.osd = m.top.findNode("osd")
+
+end sub
+
+
+sub showOSD()
+
+    if isValid(m.osd)
+        m.osd.callFunc("show")
+    end if
+
+end sub
+
+
+sub hideOSD()
+
+    if isValid(m.osd)
+        m.osd.callFunc("hide")
+    end if
 
 end sub
