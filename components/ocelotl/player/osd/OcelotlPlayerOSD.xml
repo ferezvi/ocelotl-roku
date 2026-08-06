@@ -39,7 +39,7 @@
 
         <Clock id="clock" translation="[1600,50]" />
 
-        <OcelotlPlayerControls id="controls" />
+        <PlayerControls id="controls" />
 
     </children>
 

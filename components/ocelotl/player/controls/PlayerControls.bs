@@ -1,0 +1,24 @@
+sub init()
+    print "OCELOTL CONTROLS INIT"
+
+    m.content = m.top.findNode("content")
+
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+
+    if not press then return false
+
+    if key = "OK"
+        m.top.action = "show"
+        return true
+    end if
+
+    if key = "back"
+        m.top.action = "hide"
+        return true
+    end if
+
+    return false
+
+end function
