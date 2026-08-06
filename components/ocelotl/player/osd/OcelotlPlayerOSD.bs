@@ -8,29 +8,45 @@ sub init()
     findNodes()
     initFields()
     m.top.observeField("logoImage", "onLogoImageChanged")
+    m.top.observeField("itemTitleText", "onItemTitleChanged")
+    m.top.observeField("itemSubtitleText", "onItemSubtitleChanged")
+    m.top.observeField("seasonNumber", "onSeasonNumberChanged")
+    m.top.observeField("episodeNumber", "onEpisodeNumberChanged")
+    m.top.observeField("episodeNumberEnd", "onEpisodeNumberEndChanged")
 
 end sub
-
 
 sub findNodes()
 
     m.logoImage = m.top.findNode("logoImage")
-    m.titleLabel = m.top.findNode("titleLabel")
-    m.subtitleLabel = m.top.findNode("subtitleLabel")
+    m.videoInfo = m.top.findNode("videoInfo")
+    m.itemTitle = m.top.findNode("itemTitle")
+    m.itemSubtitle = m.top.findNode("itemSubtitle")
+    m.itemSeason = m.top.findNode("itemSeason")
+    m.itemEpisode = m.top.findNode("itemEpisode")
+    m.itemEpisodeEnd = m.top.findNode("itemEpisodeEnd")
 
 end sub
 
 sub initFields()
 
-    m.titleLabel.text = "Prueba Ocelotl Player"
-    m.subtitleLabel.text = "Subtitulo de prueba"
-
-
-    m.titleLabel.color = chainLookupReturn(m.global.session, "user.settings.colorText", ColorPalette.TEXT_PRIMARY)
-    m.subtitleLabel.color = chainLookupReturn(m.global.session, "user.settings.colorSubText", ColorPalette.TEXT_SECONDARY)
+    m.itemTitle.color = chainLookupReturn(m.global.session, "user.settings.colorText", ColorPalette.TEXT_PRIMARY)
+    m.itemSubtitle.color = chainLookupReturn(m.global.session, "user.settings.colorSubText", ColorPalette.TEXT_SECONDARY)
 
 end sub
 
+sub onItemTitleChanged()
+
+    m.itemTitle.text = m.top.itemTitleText
+
+end sub
+
+
+sub onItemSubtitleChanged()
+
+    m.itemSubtitle.text = m.top.itemSubtitleText
+
+end sub
 
 sub onPlaybackStateChanged()
 
@@ -64,21 +80,63 @@ end sub
 '
 ' @param {dynamic} event - field change event
 sub onLogoLoadStatusChanged(event)
+
     if LCase(event.GetData()) = "ready"
-        logoImage = event.getRoSGNode()
-        logoImage.unobserveField("loadStatus")
+        m.logoImage.unobserveField("loadStatus")
     end if
+
 end sub
 
 ' onLogoImageChanged: Handler for changes to m.top.logoImage param.
 '
 sub onLogoImageChanged()
+
     if isValidAndNotEmpty(m.top.logoImage)
-        logoImage = createObject("roSGNode", "Poster")
-        logoImage.Id = "logoImage"
-        logoImage.observeField("loadStatus", "onLogoLoadStatusChanged")
-        logoImage.uri = m.top.logoImage
-        logoImage.translation = [103, 61]
-        m.top.appendChild(logoImage)
+        m.logoImage.observeField("loadStatus", "onLogoLoadStatusChanged")
+        m.logoImage.uri = m.top.logoImage
     end if
+
+end sub
+
+sub onSeasonNumberChanged()
+
+    updateEpisodeInfo()
+
+end sub
+
+
+sub onEpisodeNumberChanged()
+
+    updateEpisodeInfo()
+
+end sub
+
+
+sub onEpisodeNumberEndChanged()
+
+    updateEpisodeInfo()
+
+end sub
+
+sub updateEpisodeInfo()
+
+    seasonText = ""
+    episodeText = ""
+
+    if m.top.seasonNumber <> invalid
+        seasonText = tr("Season") + " " + m.top.seasonNumber.toStr()
+    end if
+
+    if m.top.episodeNumber <> invalid
+        episodeText = tr("Episode") + " " + m.top.episodeNumber.toStr()
+    end if
+
+    if seasonText <> "" and episodeText <> ""
+        m.itemSubtitle.text = seasonText + ": " + episodeText
+    else if seasonText <> ""
+        m.itemSubtitle.text = seasonText
+    else if episodeText <> ""
+        m.itemSubtitle.text = episodeText
+    end if
+
 end sub

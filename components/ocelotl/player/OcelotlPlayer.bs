@@ -1,3 +1,4 @@
+import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
@@ -5,9 +6,11 @@ import "pkg:/source/utils/misc.bs"
 
 sub init()
 
+    m.top.enableUI = false ' Disable Roku's native playback UI - Ocelotl uses its own OSD
     m.top.observeField("state", "onPlayerStateChanged")
 
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
+    m.currentItem = currentItem
 
     m.LoadMetaDataTask = CreateObject("roSGNode", "LoadVideoContentTask")
 
@@ -26,15 +29,33 @@ end sub
 
 sub onVideoContentLoaded()
 
-    print "OcelotlPlayer content loaded"
-
     videoContent = m.LoadMetaDataTask.content
 
     if isValid(videoContent) and videoContent.count() > 0
 
         m.top.content = videoContent[0].content
+
         if isValidAndNotEmpty(videoContent[0].logoImage)
             m.osd.logoImage = videoContent[0].logoImage
+        end if
+
+        if isValid(videoContent[0].seasonNumber) and isValid(videoContent[0].episodeNumber)
+            m.osd.itemTitleText = `${tr("Season")} ${videoContent[0].seasonNumber}: ${videoContent[0].content.title}`
+
+            episodeText = `${tr("Episode")} ${videoContent[0].episodeNumber}`
+            if isValid(videoContent[0].episodeNumberEnd)
+                episodeText += `-${videoContent[0].episodeNumberEnd}`
+            end if
+            m.osd.itemSubtitleText = episodeText
+        else
+            ' Movie: title / year
+            m.osd.itemTitleText = videoContent[0].content.title
+
+            if isValidAndNotEmpty(m.currentItem.SubTitle)
+                m.osd.itemSubtitleText = m.currentItem.SubTitle.split(" - ")[0]
+            else
+                m.osd.itemSubtitleText = ""
+            end if
         end if
 
         m.top.setFocus(true)
@@ -57,7 +78,16 @@ end sub
 
 sub onPlayerStateChanged()
 
+    if isValid(m.osd)
+        m.osd.playbackState = m.top.state
+    end if
 
+    ' Playback started successfully - clear the global scene spinner and
+    ' re-enable the remote (set by startLoadingSpinner() in MainEventHandlers.bs
+    ' before quickplay.video/series was invoked)
+    if m.top.state = "playing"
+        stopLoadingSpinner()
+    end if
 
 end sub
 
