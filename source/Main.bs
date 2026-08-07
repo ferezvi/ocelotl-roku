@@ -61,8 +61,7 @@ sub Main (args as dynamic) as void
     sceneManager.callFunc("clearScenes")
 
     ' load home page
-    group = CreateHomeGroup()
-    group.callFunc("loadLibraries")
+    group = CreatePlayer()
     stopLoadingSpinner()
     sceneManager.callFunc("pushScene", group)
 

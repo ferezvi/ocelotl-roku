@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="Player" extends="Group">
+
+    <children>
+
+        <Rectangle
+            width="1920"
+            height="1080"
+            color="0x202020FF" />
+
+        <ButtonGroup id="videoControls" itemSpacings="[20,420,20]" layoutDirection="horiz" translation="[96,940]">
+            <Button id="itemBack" text="" iconUri="pkg:/images/ocelotl/icons/button/skip-back.png" focusBitmapUri="pkg:/images/ocelotl/ui/focus/focusCircle.png" focusBitmapBlendColor="0x7C3AEDFF" height="64" minWidth="64" maxWidth="64" />
+            <Button id="videoPlayPause" text="" iconUri="pkg:/images/ocelotl/icons/button/play.png" focusBitmapUri="pkg:/images/ocelotl/ui/focus/focusCircle.png" focusBitmapBlendColor="0x7C3AEDFF" height="64" minWidth="64" maxWidth="64" />
+            <Button id="itemNext" text="" iconUri="pkg:/images/ocelotl/icons/button/skip-forward.png" focusBitmapUri="pkg:/images/ocelotl/ui/focus/focusCircle.png" focusBitmapBlendColor="0x7C3AEDFF" height="64" minWidth="64" maxWidth="64" />
+        </ButtonGroup>
+    </children>
+
+</component>

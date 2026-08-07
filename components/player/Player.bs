@@ -1,0 +1,3 @@
+sub init()
+    m.top.findNode("videoControls").setFocus(true)
+end sub

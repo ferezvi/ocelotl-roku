@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="SymbolButton" extends="Group">
+
+    <children>
+        <Button id="focusButton" maxWidth="24" maxHeight="96" opacity="0" />
+        <Poster id="background" />
+        <Poster id="icon" />
+    </children>
+
+    <interface>
+        <field id="buttonSize" type="integer" value="96" />
+        <field id="iconSize" type="integer" value="36" />
+        <field id="padding" type="integer" value="16" />
+        <field id="iconUri" type="uri" />
+        <field id="focusBackgroundUri" type="uri" />
+    </interface>
+
+</component>

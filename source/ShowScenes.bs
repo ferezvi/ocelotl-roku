@@ -1190,3 +1190,8 @@ sub playbackOptionDialog(time as longinteger, meta as object)
     stopLoadingSpinner()
     m.global.sceneManager.callFunc("optionDialog", "playback", tr("Playback Options"), [], resumeData, { id: string.EMPTY })
 end sub
+
+function CreatePlayer()
+    group = CreateObject("roSGNode", "Player")
+    return group
+end function

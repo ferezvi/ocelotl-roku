@@ -1,0 +1,57 @@
+sub init()
+
+    m.focusButton = m.top.findNode("focusButton")
+    m.background = m.top.findNode("background")
+    m.icon = m.top.findNode("icon")
+
+    m.top.observeField("buttonSize", "updateSize")
+    m.top.observeField("iconSize", "updateSize")
+    m.top.observeField("padding", "updateSize")
+    m.top.observeField("iconUri", "updateIcon")
+    m.top.observeField("focusBackgroundUri", "updateFocus")
+
+    updateSize()
+    updateIcon()
+    updateFocus()
+
+end sub
+
+
+sub updateSize()
+
+    size = m.top.buttonSize
+
+    m.top.width = size
+    m.top.height = size
+
+    m.focusButton.height = size
+    m.focusButton.minWidth = size
+    m.focusButton.maxWidth = size
+
+    iconSize = m.top.iconSize
+
+    m.icon.width = iconSize
+    m.icon.height = iconSize
+    m.icon.translation = [
+        (size - iconSize) / 2,
+        (size - iconSize) / 2
+    ]
+
+    m.background.width = size
+    m.background.height = size
+
+end sub
+
+
+sub updateIcon()
+
+    m.icon.uri = m.top.iconUri
+
+end sub
+
+
+sub updateFocus()
+
+    m.focusButton.focusBitmapUri = m.top.focusBackgroundUri
+
+end sub
