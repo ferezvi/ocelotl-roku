@@ -6,6 +6,7 @@
         <field id="hasFocus" type="boolean" alwaysNotify="true" />
         <field id="action" type="string" alwaysNotify="true" />
         <field id="playbackState" type="string" alwaysNotify="true" />
+        <function name="focusDefaultButton" />
     </interface>
 
     <children>

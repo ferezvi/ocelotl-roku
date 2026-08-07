@@ -68,16 +68,13 @@ sub onControlAction()
 end sub
 
 sub show()
-
     m.top.visible = true
-
+    m.controls.setFocus(true)
+    m.controls.callFunc("focusDefaultButton")
 end sub
 
-
 sub hide()
-
     m.top.visible = false
-
 end sub
 
 ' onLogoLoadStatusChanged: Handler for changes to logo image's status.

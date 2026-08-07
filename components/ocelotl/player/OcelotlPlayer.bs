@@ -69,17 +69,6 @@ sub onVideoContentLoaded()
 
 end sub
 
-sub onOSDAction()
-
-    if m.osd.action = "show"
-        showOSD()
-    else if m.osd.action = "hide"
-        hideOSD()
-    end if
-
-end sub
-
-
 sub onPlayerStateChanged()
 
     if isValid(m.osd)
@@ -96,30 +85,13 @@ sub onPlayerStateChanged()
 end sub
 
 
-sub showOSD()
-
-    if isValid(m.osd)
-        m.osd.callFunc("show")
-    end if
-
-end sub
-
-
-sub hideOSD()
-
-    if isValid(m.osd)
-        m.osd.callFunc("hide")
-    end if
-
-end sub
-
 function onKeyEvent(key as string, press as boolean) as boolean
 
     if press and key = "OK"
         if m.osd.visible
-            m.osd.visible = false
+            hideOSD()
         else
-            m.osd.visible = true
+            showOSD()
         end if
         return true
     end if
@@ -127,6 +99,23 @@ function onKeyEvent(key as string, press as boolean) as boolean
     return false
 
 end function
+
+
+sub showOSD()
+    if isValid(m.osd)
+        m.osd.callFunc("show")
+    end if
+end sub
+
+
+sub hideOSD()
+    if isValid(m.osd)
+        m.osd.callFunc("hide")
+        m.top.setFocus(true) ' <- regresa el foco real al Video al cerrar el OSD
+    end if
+end sub
+
+
 ' onControlAction: Dispatches presses coming from OcelotlPlayerControls
 ' (forwarded through the OSD's controlAction field) to actual playback commands.
 '
