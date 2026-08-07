@@ -12,6 +12,16 @@
         <field id="controlAction" type="string" alwaysNotify="true" />
         <field id="voiceCommand" type="assocarray" alwaysNotify="true" />
 
+        <!-- Track data / selection state, poblado desde LoadVideoContentTask -->
+        <field id="audioIndex" type="integer" alwaysNotify="true" />
+        <field id="selectedSubtitle" type="integer" alwaysNotify="true" />
+        <field id="subtitleTrack" type="string" />
+        <field id="globalCaptionMode" type="string" />
+        <field id="previousSubtitleWasEncoded" type="boolean" />
+        <field id="fullAudioData" type="array" />
+        <field id="fullSubtitleData" type="array" />
+        <field id="audioTrack" type="string" />
+
         <function name="showOSD" />
         <function name="hideOSD" />
     </interface>
@@ -19,10 +29,9 @@
     <children>
         <Group id="overlay" />
 
-        <OcelotlPlayerOSD
-            id="osd"
-            visible="false"
-        />
+        <OcelotlPlayerOSD id="osd" visible="false" />
+
+        <OcelotlLanguagePanel id="languagePanel" visible="false" />
     </children>
 
 </component>

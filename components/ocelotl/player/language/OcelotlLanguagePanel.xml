@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="OcelotlLanguagePanel" extends="Group">
+    <interface>
+        <field id="audioContent" type="array" />
+        <field id="subtitleContent" type="array" />
+        <field id="selectionMade" type="assocarray" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Poster
+            id="background"
+            uri="pkg:/images/ocelotl/ui/osd/language_panel.png"
+            width="960"
+            height="1080" />
+        <LayoutGroup id="columnsContainer" layoutDirection="horiz" itemSpacings="[20]" translation="[20,290]">
+
+            <LayoutGroup id="audioColumn" layoutDirection="vert" itemSpacings="[18]">
+                <Text id="audioHeader" text="Audio" font="font:SmallBoldSystemFont" color="0xFFFFFFFF" />
+                <ButtonGroup id="audioButtons" layoutDirection="vert" itemSpacings="[4]" />
+            </LayoutGroup>
+
+            <LayoutGroup id="subtitleColumn" layoutDirection="vert" itemSpacings="[18]">
+                <Text id="subtitleHeader" text="Subtitles" font="font:SmallBoldSystemFont" color="0xFFFFFFFF" />
+                <ButtonGroup id="subtitleButtons" layoutDirection="vert" itemSpacings="[4]" />
+            </LayoutGroup>
+
+        </LayoutGroup>
+    </children>
+
+</component>

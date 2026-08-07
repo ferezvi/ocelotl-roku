@@ -15,6 +15,7 @@
         <field id="controlAction" type="string" alwaysNotify="true" />
         <function name="show" />
         <function name="hide" />
+        <function name="focusControls" />
     </interface>
 
     <children>

@@ -10,6 +10,7 @@
     <field id="iconSize" type="integer" value="24" />
     <field id="focus" type="boolean" />
     <field id="escape" type="string" value="" alwaysNotify="true" />
+    <field id="pressed" type="boolean" alwaysNotify="true" />
   </interface>
 
   <children>

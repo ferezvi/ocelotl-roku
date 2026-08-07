@@ -5,27 +5,33 @@ sub init()
     m.content = m.top.findNode("content")
     m.videoControls = m.top.findNode("videoControls")
     m.focusIndex = 4
-
     cursorColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
 
-    ' listen for escape events from each button to handle focus movement
     children = m.videoControls.getChildren(-1, 0)
     for each child in children
         child.observeField("escape", "onButtonEscape")
+        child.observeField("pressed", "onButtonPressed")
         child.focusBackground = cursorColor
     end for
 end sub
 
+sub onButtonPressed(event as object)
+    btn = event.getRoSGNode()
+    m.top.action = btn.id
+end sub
+
 sub setButtonFocus(index as integer)
+
     prevBtn = m.videoControls.getChild(m.focusIndex)
     if prevBtn <> invalid
         prevBtn.focus = false
     end if
 
     m.focusIndex = index
+
     btn = m.videoControls.getChild(m.focusIndex)
-    btn.focus = true ' estado visual (tu campo custom)
-    btn.setFocus(true) ' foco REAL -> aquí es donde llegan las teclas
+    btn.focus = true
+    btn.setFocus(true)
 end sub
 
 sub onButtonEscape(event as object)
@@ -50,11 +56,6 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-
-    if key = "OK"
-        m.top.action = "show"
-        return true
-    end if
 
     if key = "back"
         m.top.action = "hide"

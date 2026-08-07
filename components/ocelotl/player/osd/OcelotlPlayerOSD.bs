@@ -77,6 +77,10 @@ sub hide()
     m.top.visible = false
 end sub
 
+sub focusControls()
+    m.controls.callFunc("focusDefaultButton")
+end sub
+
 ' onLogoLoadStatusChanged: Handler for changes to logo image's status.
 '
 ' @param {dynamic} event - field change event

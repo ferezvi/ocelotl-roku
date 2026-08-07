@@ -1,5 +1,6 @@
 import "pkg:/source/enums/ItemType.bs"
 import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/String.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
@@ -11,9 +12,11 @@ sub init()
     m.top.enableUI = false ' Disable Roku's native playback UI - Ocelotl uses its own OSD
     m.top.observeField("state", "onPlayerStateChanged")
     m.top.observeField("controlAction", "onControlAction")
+    m.top.observeField("audioIndex", "onAudioIndexChange")
 
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.currentItem = currentItem
+    m.top.videoId = currentItem.id
 
     m.LoadMetaDataTask = CreateObject("roSGNode", "LoadVideoContentTask")
 
@@ -29,6 +32,36 @@ sub init()
     m.osd = m.top.findNode("osd")
     m.osd.observeField("controlAction", "onControlAction")
 
+    m.languagePanel = m.top.findNode("languagePanel")
+    m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
+    m.languagePanel.observeField("selectionMade", "onLanguageSelectionMade")
+
+end sub
+
+sub onAudioIndexChange()
+
+    if m.top.position = 0 then return
+
+    if m.LoadMetaDataTask.selectedAudioStreamIndex = m.top.audioIndex
+        return
+    end if
+
+    print "Changing audio track to:"
+    print m.top.audioIndex
+
+    m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+
+    m.top.control = VideoControl.STOP
+
+    m.LoadMetaDataTask.selectedAudioStreamIndex = m.top.audioIndex
+    m.LoadMetaDataTask.itemId = m.top.videoId
+
+    print "TASK AUDIO INDEX:"
+    print m.LoadMetaDataTask.selectedAudioStreamIndex
+
+    m.LoadMetaDataTask.observeField("content", "onVideoContentLoaded")
+    m.LoadMetaDataTask.control = TaskControl.RUN
+
 end sub
 
 sub onVideoContentLoaded()
@@ -38,6 +71,8 @@ sub onVideoContentLoaded()
     if isValid(videoContent) and videoContent.count() > 0
 
         m.top.content = videoContent[0].content
+        print "LOADED AUDIO INDEX:"
+        print videoContent[0].audioIndex
 
         if isValidAndNotEmpty(videoContent[0].logoImage)
             m.osd.logoImage = videoContent[0].logoImage
@@ -62,6 +97,12 @@ sub onVideoContentLoaded()
             end if
         end if
 
+        m.top.fullAudioData = videoContent[0].fullAudioData
+        m.top.fullSubtitleData = videoContent[0].fullSubtitleData
+        m.top.audioIndex = videoContent[0].audioIndex
+        m.top.audioTrack = m.top.audioIndex.toStr()
+        m.top.selectedSubtitle = videoContent[0].SelectedSubtitle
+
         m.top.setFocus(true)
         m.top.control = VideoControl.PLAY
 
@@ -82,6 +123,10 @@ sub onPlayerStateChanged()
         stopLoadingSpinner()
     end if
 
+end sub
+
+sub focusControls()
+    m.controls.callFunc("focusDefaultButton")
 end sub
 
 
@@ -171,9 +216,175 @@ sub onControlAction()
     end if
 
     if action = "languageButton"
-        ' TODO: audio/subtitle picker not built yet
-        print "OcelotlPlayer: language picker (not implemented)"
+        showLanguagePanel()
         return
     end if
 
 end sub
+
+sub showLanguagePanel()
+
+    m.osd.setFocus(false)
+
+    m.languagePanel.audioContent = buildAudioContent()
+    m.languagePanel.subtitleContent = buildSubtitleContent()
+
+    m.languagePanel.visible = true
+    m.languagePanel.setFocus(true)
+
+end sub
+
+sub onLanguagePanelVisibleChanged()
+    if not m.languagePanel.visible
+        ' Panel cerrado (selección u "back") -> regresar foco real a los controles del OSD
+        m.osd.callFunc("focusControls")
+    end if
+end sub
+
+function buildAudioContent() as object
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+    data = []
+
+    for each item in m.top.fullAudioData
+        audioStreamItem = {
+            "Index": item.Index,
+            "RokuTrackName": item.RokuTrackName,
+            "IsExternal": item.IsExternal,
+            "Type": "audioselection",
+            "track": { "description": item.DisplayTitle }
+        }
+
+        if isStringEqual(preferredAudioTrackName, string.EMPTY)
+            audioStreamItem.selected = (m.top.audioIndex = item.Index)
+        else
+            audioStreamItem.selected = isStringEqual(item.RokuTrackName, preferredAudioTrackName)
+        end if
+
+        data.push(audioStreamItem)
+    end for
+
+    return data
+end function
+
+function buildSubtitleContent() as object
+    data = []
+    selectedSubtitleIsExternal = false
+
+    for each item in m.top.fullSubtitleData
+        item.type = "subtitleselection"
+
+        if m.top.selectedSubtitle <> SubtitleSelection.NONE
+            if item.Index = m.top.selectedSubtitle
+                item.selected = true
+                selectedSubtitleIsExternal = item.LookupCI("IsExternal")
+            end if
+        else
+            availableSubtitleTrackIndex = availSubtitleTrackIdx(item.track.TrackName)
+            if availableSubtitleTrackIndex <> SubtitleSelection.NONE
+                subtitleFullTrackName = m.top.availableSubtitleTracks[availableSubtitleTrackIndex].TrackName
+                if subtitleFullTrackName = m.top.subtitleTrack
+                    item.selected = true
+                    selectedSubtitleIsExternal = item.LookupCI("IsExternal")
+                end if
+            end if
+        end if
+
+        item.StreamIndex = item.Index
+        data.push(item)
+    end for
+
+    ' Opción "None" al frente
+    data.Unshift({
+        "Index": SubtitleSelection.NONE,
+        "StreamIndex": SubtitleSelection.NONE,
+        "IsExternal": false,
+        "Type": "subtitleselection",
+        "track": { "description": "None" }
+    })
+
+    return data
+end function
+
+sub onLanguageSelectionMade()
+
+    print "===== LANGUAGE SELECTION EVENT ====="
+
+    selection = m.languagePanel.selectionMade
+
+    print "TYPE:"
+    print selection.Type
+
+    print "INDEX:"
+    print selection.Index
+
+    print "DESC:"
+    print selection.track.description
+
+    if LCase(selection.Type) = "audioselection"
+        print "APPLY AUDIO"
+        applyAudioSelection(selection)
+
+    else if LCase(selection.Type) = "subtitleselection"
+        print "APPLY SUBTITLE"
+        applySubtitleSelection(selection)
+    end if
+
+end sub
+
+sub applyAudioSelection(selectedAudioTrack as object)
+    m.global.queueManager.callFunc("setPreferredAudioTrackIndex", selectedAudioTrack.Index)
+    m.top.audioIndex = selectedAudioTrack.Index
+end sub
+
+sub applySubtitleSelection(selectedSubtitle as object)
+    if m.top.selectedSubtitle <> SubtitleSelection.NONE or selectedSubtitle.Index <> SubtitleSelection.NONE
+        if m.top.selectedSubtitle = selectedSubtitle.Index then return
+    end if
+
+    for each item in m.top.fullSubtitleData
+        if item.Index = m.top.selectedSubtitle
+            m.top.previousSubtitleWasEncoded = item.IsEncoded
+            exit for
+        end if
+    end for
+
+    if LCase(selectedSubtitle.track.description) = "none"
+        m.top.globalCaptionMode = "Off"
+        m.top.subtitleTrack = ""
+        m.top.selectedSubtitle = SubtitleSelection.NONE
+        m.global.queueManager.callFunc("setPreferredSubtitleTrack", selectedSubtitle)
+        return
+    end if
+
+    if selectedSubtitle.IsEncoded
+        m.top.globalCaptionMode = "Off"
+    else
+        m.top.globalCaptionMode = "On"
+        availableSubtitleTrackIndex = availSubtitleTrackIdx(selectedSubtitle.Track.TrackName)
+        if availableSubtitleTrackIndex = SubtitleSelection.NONE then return
+        m.top.subtitleTrack = m.top.availableSubtitleTracks[availableSubtitleTrackIndex].TrackName
+    end if
+
+    m.global.queueManager.callFunc("setPreferredSubtitleTrack", selectedSubtitle)
+    m.top.selectedSubtitle = selectedSubtitle.Index
+end sub
+
+' availSubtitleTrackIdx: Returns Roku's index for requested subtitle track
+'
+' @param {string} tracknameToFind - TrackName for subtitle we're looking to match
+' @return {integer} indicating Roku's index for requested subtitle track. Returns SubtitleSelection.NONE if not found
+function availSubtitleTrackIdx(tracknameToFind as string) as integer
+    idx = 0
+    for each availTrack in m.top.availableSubtitleTracks
+        ' The TrackName must contain the URL we supplied originally, though
+        ' Roku mangles the name a bit, so we check if the URL is a substring, rather
+        ' than strict equality
+        if Instr(1, availTrack.TrackName, tracknameToFind)
+            return idx
+        end if
+        idx = idx + 1
+    end for
+    return SubtitleSelection.NONE
+end function
+
+
