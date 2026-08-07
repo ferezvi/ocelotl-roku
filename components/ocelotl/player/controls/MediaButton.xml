@@ -5,7 +5,7 @@
 
     <Poster
       id="buttonBackground"
-      uri="pkg:/images/ocelotl/ui/buttons/focusCircle.png"
+      uri="pkg:/images/ocelotl/ui/focus/focusCircle.png"
       visible="false"
       loadDisplayMode="scaleToFit"
     />
