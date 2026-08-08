@@ -1,0 +1,113 @@
+sub init()
+    m.sizer = m.top.findNode("sizer")
+    m.background = m.top.findNode("background")
+    m.iconPoster = m.top.findNode("iconPoster")
+
+    m.background.uri = m.top.backgroundUri
+
+    updateLayout()
+    updateVisualState()
+end sub
+
+' Material Design 3 icon button size tokens: [container, icon] in dp
+function getSizeTable() as object
+    return {
+        extrasmall: { container: 32, icon: 20 },
+        small: { container: 40, icon: 24 },
+        medium: { container: 56, icon: 24 },
+        large: { container: 96, icon: 32 },
+        extralarge: { container: 136, icon: 40 }
+    }
+end function
+
+sub onLayoutFieldsChanged()
+    updateLayout()
+end sub
+
+sub onIconChanged()
+    m.iconPoster.uri = m.top.icon
+end sub
+
+sub onBackgroundUriChanged()
+    m.background.uri = m.top.backgroundUri
+end sub
+
+' Resolves container/icon size from the fixed M3 token table, then derives
+' the background size as a ratio of the icon (state-layer pattern), and
+' centers scaleRotateCenter on both nodes so scale-on-focus stays symmetric.
+sub updateLayout()
+    table = getSizeTable()
+    key = LCase(m.top.size)
+
+    tokens = table[key]
+    if tokens = invalid
+        print "[MDIconButton] invalid size: '"; m.top.size; "' -- falling back to 'small'"
+        tokens = table["small"]
+    end if
+
+    containerSize = tokens.container
+    iconSize = tokens.icon
+    padding = (containerSize - iconSize) / 2
+
+    ' This is what LayoutGroup reads for alignment - must be the resting size,
+    ' scale (applied below) never touches width/height. Group itself has no
+    ' width/height fields, so the sizer Rectangle stands in for it.
+    m.sizer.width = containerSize
+    m.sizer.height = containerSize
+
+    backgroundSize = iconSize * m.top.backgroundRatio
+    backgroundOffset = (containerSize - backgroundSize) / 2
+
+    m.background.width = backgroundSize
+    m.background.height = backgroundSize
+    m.background.translation = [backgroundOffset, backgroundOffset]
+    m.background.scaleRotateCenter = [backgroundSize / 2, backgroundSize / 2]
+
+    m.iconPoster.width = iconSize
+    m.iconPoster.height = iconSize
+    m.iconPoster.translation = [padding, padding]
+    m.iconPoster.scaleRotateCenter = [iconSize / 2, iconSize / 2]
+end sub
+
+sub onVisualStateChanged()
+    updateVisualState()
+end sub
+
+' Focus is NOT self-detected: the parent container explicitly sets "focused"
+' when it moves selection (together with calling setFocus() on this node).
+sub updateVisualState()
+    scale = m.top.unfocusedScale
+    if m.top.focused then scale = m.top.focusedScale
+
+    m.background.scale = [scale, scale]
+    m.iconPoster.scale = [scale, scale]
+
+    if m.top.disabled
+        m.background.blendColor = m.top.disabledColor
+        m.iconPoster.blendColor = m.top.iconDisabledColor
+    else if m.top.focused
+        m.background.blendColor = m.top.focusedColor
+        m.iconPoster.blendColor = m.top.iconFocusedColor
+    else
+        m.background.blendColor = m.top.unfocusedColor
+        m.iconPoster.blendColor = m.top.iconUnfocusedColor
+    end if
+end sub
+
+' Convenience for parent containers: sets the visual state field AND grabs
+' real native focus in one call, in the correct order.
+sub focusButton()
+    m.top.focused = true
+    m.top.setFocus(true)
+end sub
+
+' Only intercepts OK. Everything else (including arrow keys) returns false
+' so it bubbles up to the parent container, which owns navigation.
+function onKeyEvent(key as string, press as boolean) as boolean
+    if press and key = "OK" and not m.top.disabled
+        m.top.buttonSelected = true
+        return true
+    end if
+
+    return false
+end function

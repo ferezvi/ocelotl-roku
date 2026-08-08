@@ -1,0 +1,78 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' Phase 1: minimal playback wiring only.
+'
+' Everything the legacy player handles beyond this - OSD, subtitle/audio
+' track switching, live TV, trickplay, chapters, retry/error recovery - is
+' intentionally left out here. Each of those will come back as its own
+' modular piece once basic playback is confirmed working end to end.
+
+sub init()
+    m.top.enableUI = false
+    currentItem = m.global.queueManager.callFunc("getCurrentItem")
+    m.top.id = currentItem.id
+
+    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+    m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : -2
+
+    m.loadContentTask = CreateObject("roSGNode", "LoadVideoContentTask")
+    m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
+    m.loadContentTask.itemId = currentItem.id
+    m.loadContentTask.itemType = currentItem.type
+    m.loadContentTask.selectedAudioStreamIndex = currentItem.selectedAudioStreamIndex
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+
+    m.top.observeField("state", "onStateChanged")
+
+    m.top.setFocus(true)
+    print "[VideoPlayerView2] focus="; m.top.hasFocus()
+end sub
+
+sub onVideoContentLoaded()
+    m.loadContentTask.unobserveField("content")
+    m.loadContentTask.control = TaskControl.STOP
+
+    videoContent = m.loadContentTask.content
+    m.loadContentTask.content = []
+
+    if not isValid(videoContent) or not isValid(videoContent[0])
+        print "[VideoPlayerView2] failed to load playback data"
+        m.top.backPressed = true
+        return
+    end if
+
+    item = videoContent[0]
+
+    m.top.PlaySessionId = item.PlaySessionId
+    m.top.videoId = item.id
+    m.top.container = item.container
+    m.top.mediaSourceId = item.mediaSourceId
+    m.top.fullSubtitleData = item.fullSubtitleData
+    m.top.fullAudioData = item.fullAudioData
+    m.top.audioIndex = item.audioIndex
+    m.top.transcodeParams = item.transcodeparams
+    m.top.isTranscoded = item.isTranscoded
+
+    m.top.content = item.content
+    m.top.control = VideoControl.PLAY
+    m.top.setFocus(true)
+end sub
+
+sub onStateChanged()
+    print "[VideoPlayerView2] state: "; m.top.state
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    print "[VideoPlayerView2] onKeyEvent key="; key; " press="; press
+
+    if press and key = KeyCode.BACK
+        print "[VideoPlayerView2] BACK detected, stopping video"
+        m.top.control = VideoControl.STOP
+    end if
+
+    return false
+end function

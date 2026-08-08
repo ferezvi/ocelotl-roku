@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="MDIconButton" extends="Group">
+
+    <interface>
+        <!-- Material Design 3 icon button size tokens -->
+        <!-- extraSmall | small | medium | large | extraLarge -->
+        <field id="size" type="string" value="small" onChange="onLayoutFieldsChanged" />
+
+        <!-- narrow | default | wide (TODO: not implemented yet, only affects large/extraLarge) -->
+        <field id="width" type="string" value="default" />
+
+        <field id="icon" type="uri" onChange="onIconChanged" />
+        <field id="backgroundUri" type="uri" value="pkg:/images/ui/focus/focusCircle.png" onChange="onBackgroundUriChanged" />
+        <field id="backgroundRatio" type="float" value="1.4" onChange="onLayoutFieldsChanged" />
+
+        <!-- The parent sets this explicitly when it moves selection. The button never
+             self-detects focus - this keeps focus logic centralized in the container. -->
+        <field id="focused" type="boolean" value="false" alwaysNotify="true" onChange="onVisualStateChanged" />
+        <field id="disabled" type="boolean" value="false" onChange="onVisualStateChanged" />
+
+        <!-- Colors applied via blendColor on grayscale assets, no per-state image variants needed -->
+        <field id="focusedColor" type="color" value="0x7C3AEDFF" />
+        <field id="unfocusedColor" type="color" value="0x00000000" />
+        <field id="disabledColor" type="color" value="0x33333380" />
+
+        <field id="iconFocusedColor" type="color" value="0xFFFFFFFF" />
+        <field id="iconUnfocusedColor" type="color" value="0xCCCCCCFF" />
+        <field id="iconDisabledColor" type="color" value="0x66666666" />
+
+        <!-- Scale-on-focus effect, centered so neighboring buttons stay aligned -->
+        <field id="unfocusedScale" type="float" value="1.0" />
+        <field id="focusedScale" type="float" value="1.15" />
+
+        <!-- The parent observes this to react to a selection -->
+        <field id="buttonSelected" type="boolean" value="false" alwaysNotify="true" />
+
+        <function name="focusButton" />
+    </interface>
+
+    <children>
+        <!-- Invisible sizer: Group has no width/height fields of its own,
+             so we use a transparent Rectangle to give this component a
+             real, predictable bounding box for LayoutGroup to read. -->
+        <Rectangle id="sizer" color="0x00000000" />
+        <Poster id="background" />
+        <Poster id="iconPoster" />
+    </children>
+</component>

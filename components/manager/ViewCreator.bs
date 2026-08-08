@@ -75,7 +75,22 @@ sub CreateVideoPlayerView()
 
     m.global.queueManager.callFunc("setSelectedAudioStreamIndex", preferredAudioTrackIndex)
 
-    m.view = CreateObject("roSGNode", "VideoPlayerView")
+    ' Switch between the legacy player and the new modular player.
+    ' Both expose the same field contract, so the rest of this file
+    ' does not need to know which one is active.
+    if useNewPlayer()
+        try
+            m.view = CreateObject("roSGNode", "VideoPlayerView2")
+            if not isValid(m.view)
+                m.view = CreateObject("roSGNode", "VideoPlayerView")
+            end if
+        catch e
+            m.view = CreateObject("roSGNode", "VideoPlayerView")
+        end try
+    else
+        m.view = CreateObject("roSGNode", "VideoPlayerView")
+    end if
+
     m.view.observeField("state", "onStateChange")
     m.view.observeField("selectPlaybackInfoPressed", "onSelectPlaybackInfoPressed")
     m.view.observeField("selectSubtitlePressed", "onSelectSubtitlePressed")
@@ -565,7 +580,7 @@ function handleTransportCommand(data as object) as object
         ret.status = TransportStatus.SUCCESS
 
     else if isStringEqual(cmd, TransportCommand.PAUSE) or isStringEqual(cmd, TransportCommand.STOP)
-        ret.cmd = { type: TransportCommand.PAUSE}
+        ret.cmd = { type: TransportCommand.PAUSE }
         ret.status = TransportStatus.SUCCESS
 
     else if isStringEqual(cmd, TransportCommand.PLAYPAUSE)
@@ -667,4 +682,12 @@ function handleTransportCommand(data as object) as object
     end if
 
     return ret
+end function
+
+' Temporary toggle while the new player is under construction.
+' TODO: move to a real user/registry setting once ready for QA,
+' then remove the legacy branch entirely once VideoPlayerView2
+' replaces VideoPlayerView for good.
+function useNewPlayer() as boolean
+    return true ' set to false to fall back to the legacy player
 end function
