@@ -3,6 +3,8 @@
 <component name="PlayerOSD" extends="Group">
     <interface>
         <function name="focusControls" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <field id="isPlaying" type="boolean" onChange="onIsPlayingChanged" />
     </interface>
 
     <children>

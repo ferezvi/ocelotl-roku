@@ -2,13 +2,17 @@ import "pkg:/source/utils/misc.bs"
 
 sub init()
     m.videoControls = m.top.findNode("videoControls")
+    m.videoControls.observeField("action", "onVideoControlsAction")
+end sub
+
+sub onVideoControlsAction(event as object)
+    m.top.action = event.getData()
+end sub
+
+sub onIsPlayingChanged()
+    m.videoControls.isPlaying = m.top.isPlaying
 end sub
 
 sub focusControls()
-    print "[PlayerOSD] focusControls BEGIN"
-    print "[PlayerOSD] videoControls valid="; isValid(m.videoControls)
-
     m.videoControls.callFunc("focusControls")
-
-    print "[PlayerOSD] focusControls END"
 end sub

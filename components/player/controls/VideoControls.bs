@@ -66,3 +66,12 @@ sub onChildButtonSelected(event as object)
         node.buttonSelected = false
     end if
 end sub
+
+sub onIsPlayingChanged()
+    playPauseButton = m.buttons[2]
+    if m.top.isPlaying
+        playPauseButton.icon = "pkg:/images/ui/player/pause.png"
+    else
+        playPauseButton.icon = "pkg:/images/ui/player/play.png"
+    end if
+end sub
