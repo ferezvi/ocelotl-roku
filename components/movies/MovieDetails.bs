@@ -393,6 +393,7 @@ sub itemContentChanged()
     ' Unless this is an episode
     if m.loadStatus = ViewLoadStatus.RELOAD
         if LCase(itemData.Type) <> VideoType.EPISODE
+            stopLoadingSpinner() ' Movies hit this early return and skipped the spinner shutoff at the bottom of this function, leaving it stuck on-screen after any reload
             return
         end if
     end if
