@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="VideoControls" extends="Group">
+
+    <interface>
+        <field id="itemSpacing" type="float" value="16" onChange="onItemSpacingChanged" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <function name="focusControls" />
+    </interface>
+
+    <children>
+        <LayoutGroup id="row" layoutDirection="horizontal" itemSpacings="[16]">
+            <MDIconButton id="skipBackButton" size="extraLarge" icon="pkg:/images/ui/player/skip-back.png" />
+            <MDIconButton id="rewindButton" size="extraLarge" icon="pkg:/images/ui/player/rewind.png" />
+            <MDIconButton id="playPauseButton" size="extraLarge" icon="pkg:/images/ui/player/play.png" />
+            <MDIconButton id="fastForwardButton" size="extraLarge" icon="pkg:/images/ui/player/fast-forward.png" />
+            <MDIconButton id="skipForwardButton" size="extraLarge" icon="pkg:/images/ui/player/skip-forward.png" />
+        </LayoutGroup>
+    </children>
+
+</component>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="PlayerOSD" extends="Group">
+    <interface>
+        <function name="focusControls" />
+    </interface>
+
+    <children>
+        <VideoControls id="videoControls" translation="[672, 850]" />
+    </children>
+
+</component>

@@ -1,0 +1,14 @@
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.videoControls = m.top.findNode("videoControls")
+end sub
+
+sub focusControls()
+    print "[PlayerOSD] focusControls BEGIN"
+    print "[PlayerOSD] videoControls valid="; isValid(m.videoControls)
+
+    m.videoControls.callFunc("focusControls")
+
+    print "[PlayerOSD] focusControls END"
+end sub

@@ -1,0 +1,68 @@
+sub init()
+    m.row = m.top.findNode("row")
+
+    m.buttons = [
+        m.top.findNode("skipBackButton"),
+        m.top.findNode("rewindButton"),
+        m.top.findNode("playPauseButton"),
+        m.top.findNode("fastForwardButton"),
+        m.top.findNode("skipForwardButton")
+    ]
+
+    m.currentIndex = 2
+
+    for each btn in m.buttons
+        btn.observeFieldScoped("buttonSelected", "onChildButtonSelected")
+    end for
+end sub
+
+sub onItemSpacingChanged()
+    m.row.itemSpacings = [m.top.itemSpacing]
+end sub
+
+sub focusControls()
+    setFocusedIndex(m.currentIndex)
+end sub
+
+sub setFocusedIndex(index as integer)
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+    end if
+
+    m.currentIndex = index
+    target = m.buttons[m.currentIndex]
+
+    target.focused = true
+    target.setFocus(true)
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if key = "right"
+        if m.currentIndex < m.buttons.Count() - 1
+            setFocusedIndex(m.currentIndex + 1)
+            return true
+        end if
+
+        return false
+
+    else if key = "left"
+        if m.currentIndex > 0
+            setFocusedIndex(m.currentIndex - 1)
+            return true
+        end if
+
+        return false
+    end if
+
+    return false
+end function
+
+sub onChildButtonSelected(event as object)
+    if event.getData() = true
+        node = event.getRoSGNode()
+        m.top.action = node.id
+        node.buttonSelected = false
+    end if
+end sub
