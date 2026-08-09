@@ -35,6 +35,11 @@ end sub
 ' Resolves container/icon size from the fixed M3 token table, then derives
 ' the background size as a ratio of the icon (state-layer pattern), and
 ' centers scaleRotateCenter on both nodes so scale-on-focus stays symmetric.
+'
+' NOTE: backgroundRatio is currently unused - background is sized to match
+' the full container per the M3 token table. Kept in the interface for a
+' future variant where the focus/state-layer needs to be smaller than the
+' full hit target.
 sub updateLayout()
     table = getSizeTable()
     key = LCase(m.top.size)
@@ -47,25 +52,27 @@ sub updateLayout()
 
     containerSize = tokens.container
     iconSize = tokens.icon
-    padding = (containerSize - iconSize) / 2
 
-    ' This is what LayoutGroup reads for alignment - must be the resting size,
-    ' scale (applied below) never touches width/height. Group itself has no
-    ' width/height fields, so the sizer Rectangle stands in for it.
-    m.sizer.width = containerSize
-    m.sizer.height = containerSize
+    ' Reserve enough static footprint (including focus scale headroom) so
+    ' LayoutGroup never sees this button's bounds grow past what it already
+    ' allocated - otherwise scaling up on focus reflows/shifts sibling buttons.
+    maxScale = m.top.focusedScale
+    if m.top.unfocusedScale > maxScale then maxScale = m.top.unfocusedScale
+    reservedSize = containerSize * maxScale
 
-    backgroundSize = iconSize * m.top.backgroundRatio
-    backgroundOffset = (containerSize - backgroundSize) / 2
+    m.sizer.width = reservedSize
+    m.sizer.height = reservedSize
 
-    m.background.width = backgroundSize
-    m.background.height = backgroundSize
+    backgroundOffset = (reservedSize - containerSize) / 2
+    m.background.width = containerSize
+    m.background.height = containerSize
     m.background.translation = [backgroundOffset, backgroundOffset]
-    m.background.scaleRotateCenter = [backgroundSize / 2, backgroundSize / 2]
+    m.background.scaleRotateCenter = [containerSize / 2, containerSize / 2]
 
+    iconOffset = (reservedSize - iconSize) / 2
     m.iconPoster.width = iconSize
     m.iconPoster.height = iconSize
-    m.iconPoster.translation = [padding, padding]
+    m.iconPoster.translation = [iconOffset, iconOffset]
     m.iconPoster.scaleRotateCenter = [iconSize / 2, iconSize / 2]
 end sub
 
