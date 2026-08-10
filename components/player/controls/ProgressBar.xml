@@ -21,5 +21,7 @@
     <children>
         <Poster id="track" />
         <Poster id="fill" />
+        <Label id="currentTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" />
+        <Label id="remainingTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" horizAlign="right" />
     </children>
 </component>

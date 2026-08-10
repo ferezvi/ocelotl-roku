@@ -1,6 +1,7 @@
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
+const TIME_LABEL_TOP_PADDING = 12
 const SEEK_STEP_SECONDS = 10
 const SEEK_STEP_FAST = 20
 const SEEK_STEP_MAX = 30
@@ -10,6 +11,8 @@ const SEEK_HOLD_MAX_THRESHOLD = 14
 sub init()
     m.track = m.top.findNode("track")
     m.fill = m.top.findNode("fill")
+    m.currentTime = m.top.findNode("currentTime")
+    m.remainingTime = m.top.findNode("remainingTime")
 
     m.seekHoldCount = 0
     m.seekDirection = 0
@@ -71,6 +74,15 @@ end function
 ' Speeds up the repeat rate after the first tick, mirroring the official
 ' client's 0.5s -> 0.125s acceleration.
 sub onSeekRepeatTimerFire()
+    ' Guard against a missed key-up event: if focus moved away from this
+    ' node mid-hold (OSD auto-hide, a dialog stealing focus, etc.), the
+    ' release event never reaches onKeyEvent and the timer would otherwise
+    ' fire forever, driving previewPosition all the way to duration.
+    if not m.top.hasFocus()
+        stopSeekHold()
+        return
+    end if
+
     m.seekRepeatTimer.duration = 0.15
     seekStep(m.seekDirection)
 end sub
@@ -180,4 +192,22 @@ sub updateLayout()
     else
         m.fill.width = 0
     end if
+
+    updateTimeLabels(playhead)
+end sub
+
+' Updates elapsed/remaining time labels below the track. Mirrors the reference
+' OSD: elapsed time uses the live playhead (previewPosition while seeking),
+' remaining time is duration minus that same playhead.
+sub updateTimeLabels(playhead as float)
+    remaining = m.top.duration - playhead
+    if remaining < 0 then remaining = 0
+
+    m.currentTime.text = secondsToHuman(Int(playhead), true)
+    m.remainingTime.text = secondsToHuman(Int(remaining), true)
+
+    labelY = m.top.trackHeight + TIME_LABEL_TOP_PADDING
+    m.currentTime.translation = [0, labelY]
+    m.remainingTime.width = m.top.trackWidth
+    m.remainingTime.translation = [0, labelY]
 end sub
