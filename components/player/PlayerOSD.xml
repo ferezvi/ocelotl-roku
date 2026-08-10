@@ -3,12 +3,15 @@
 <component name="PlayerOSD" extends="Group">
     <interface>
         <function name="focusControls" />
+        <function name="focusProgressBar" />
         <field id="action" type="string" alwaysNotify="true" />
-        <field id="isPlaying" type="boolean" onChange="onIsPlayingChanged" />
+        <field id="seekPosition" type="float" />
+        <field id="playbackState" type="string" />
     </interface>
 
     <children>
-        <VideoControls id="videoControls" translation="[672, 850]" />
+        <ProgressBar id="progressBar" translation="[672, 790]" />
+        <VideoControls id="videoControls" translation="[672, 930]" />
     </children>
 
 </component>

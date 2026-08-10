@@ -1,3 +1,5 @@
+import "pkg:/source/enums/MediaPlaybackState.bs"
+
 sub init()
     m.row = m.top.findNode("row")
 
@@ -60,18 +62,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 sub onChildButtonSelected(event as object)
+    node = event.getRoSGNode()
+
     if event.getData() = true
-        node = event.getRoSGNode()
         m.top.action = node.id
-        node.buttonSelected = false
     end if
 end sub
 
-sub onIsPlayingChanged()
+sub onPlaybackStateChanged()
     playPauseButton = m.buttons[2]
-    if m.top.isPlaying
+
+    if m.top.playbackState = MediaPlaybackState.PLAYING
         playPauseButton.icon = "pkg:/images/ui/player/pause.png"
-    else
+    else if m.top.playbackState = MediaPlaybackState.PAUSED
         playPauseButton.icon = "pkg:/images/ui/player/play.png"
     end if
 end sub

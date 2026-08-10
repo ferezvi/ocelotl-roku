@@ -1,0 +1,24 @@
+<component name="ProgressBar" extends="Group" focusable="true">
+    <interface>
+        <field id="barUri" type="uri" value="pkg:/images/ui/player/progress_bar_$$RES$$.9.png" onChange="onBarUriChanged" />
+        <field id="trackColor" type="color" value="0xFFFFFF33" />
+        <field id="fillColor" type="color" value="0x7C3AEDFF" />
+        <field id="trackWidth" type="float" value="800" onChange="onLayoutFieldsChanged" />
+        <field id="trackHeight" type="float" value="12" onChange="onLayoutFieldsChanged" />
+
+        <!-- Playback data -->
+        <field id="position" type="float" value="0" onChange="onPositionChanged" />
+        <field id="duration" type="float" value="0" />
+        <field id="previewPosition" type="float" value="0" />
+        <field id="isSeeking" type="boolean" value="false" />
+
+        <!-- Emitted when user confirms a seek -->
+        <field id="seek" type="float" alwaysNotify="true" />
+        <function name="seekStep" />
+    </interface>
+
+    <children>
+        <Poster id="track" />
+        <Poster id="fill" />
+    </children>
+</component>

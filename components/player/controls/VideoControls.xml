@@ -5,17 +5,17 @@
     <interface>
         <field id="itemSpacing" type="float" value="16" onChange="onItemSpacingChanged" />
         <field id="action" type="string" alwaysNotify="true" />
-        <field id="isPlaying" type="boolean" onChange="onIsPlayingChanged" />
+        <field id="playbackState" type="string" onChange="onPlaybackStateChanged" />
         <function name="focusControls" />
     </interface>
 
     <children>
         <LayoutGroup id="row" layoutDirection="horizontal" itemSpacings="[0]" vertAlignment="center">
-            <MDIconButton id="skipBackButton" size="Large" icon="pkg:/images/ui/player/skip-back.png" />
-            <MDIconButton id="rewindButton" size="Large" icon="pkg:/images/ui/player/rewind.png" />
-            <MDIconButton id="playPauseButton" size="extraLarge" icon="pkg:/images/ui/player/play.png" />
-            <MDIconButton id="fastForwardButton" size="Large" icon="pkg:/images/ui/player/fast-forward.png" />
-            <MDIconButton id="skipForwardButton" size="Large" icon="pkg:/images/ui/player/skip-forward.png" />
+            <MDIconButton id="skipBackButton" size="Medium" icon="pkg:/images/ui/player/skip-back.png" />
+            <MDIconButton id="rewindButton" size="Medium" icon="pkg:/images/ui/player/rewind.png" />
+            <MDIconButton id="playPauseButton" size="Large" icon="pkg:/images/ui/player/play.png" />
+            <MDIconButton id="fastForwardButton" size="Medium" icon="pkg:/images/ui/player/fast-forward.png" />
+            <MDIconButton id="skipForwardButton" size="Medium" icon="pkg:/images/ui/player/skip-forward.png" />
         </LayoutGroup>
     </children>
 

@@ -1,0 +1,136 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+const SEEK_STEP_SECONDS = 5
+const SEEK_STEP_FAST = 15
+const SEEK_STEP_MAX = 30
+const SEEK_HOLD_FAST_THRESHOLD = 6
+const SEEK_HOLD_MAX_THRESHOLD = 14
+
+sub init()
+    m.track = m.top.findNode("track")
+    m.fill = m.top.findNode("fill")
+
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+
+    onBarUriChanged()
+    updateLayout()
+
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("duration", "onPositionChanged")
+    m.top.observeField("previewPosition", "onPositionChanged")
+    m.top.observeField("isSeeking", "onIsSeekingChanged")
+end sub
+
+' Advances the preview position one step in the given direction (1 or -1),
+' accelerating the step size the longer the same direction stays held.
+' Callable externally (e.g. by PlayerView on the very first key press,
+' before this component has focus) or internally on repeat key events.
+sub seekStep(direction as integer)
+    if m.seekDirection <> direction
+        m.seekHoldCount = 0
+        m.seekDirection = direction
+    end if
+    m.seekHoldCount++
+
+    newPlayhead = m.top.previewPosition + (direction * currentStepSize())
+    if newPlayhead > m.top.duration then newPlayhead = m.top.duration
+    if newPlayhead < 0 then newPlayhead = 0
+
+    m.top.previewPosition = newPlayhead
+    m.top.isSeeking = true
+end sub
+
+function currentStepSize() as integer
+    if m.seekHoldCount >= SEEK_HOLD_MAX_THRESHOLD then return SEEK_STEP_MAX
+    if m.seekHoldCount >= SEEK_HOLD_FAST_THRESHOLD then return SEEK_STEP_FAST
+    return SEEK_STEP_SECONDS
+end function
+
+' Applies the previewed position as the real seek and clears seeking state
+sub commitSeek()
+    if m.top.isSeeking
+        m.top.seek = m.top.previewPosition
+        m.top.isSeeking = false
+    end if
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+end sub
+
+' Discards the preview and restores the real playback position
+sub cancelSeek()
+    m.top.isSeeking = false
+    m.top.previewPosition = m.top.position
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not m.top.hasFocus() then return false
+
+    if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)
+        if press then seekStep(1) else commitSeek()
+        return true
+
+    else if isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.REWIND)
+        if press then seekStep(-1) else commitSeek()
+        return true
+
+    else if isStringEqual(key, KeyCode.OK) and press
+        if m.top.isSeeking
+            commitSeek()
+            return true
+        end if
+        return false
+
+    else if isStringEqual(key, KeyCode.BACK) and press
+        if m.top.isSeeking
+            cancelSeek()
+            return true
+        end if
+        return false
+    end if
+
+    return false
+end function
+
+sub onBarUriChanged()
+    m.track.uri = m.top.barUri
+    m.fill.uri = m.top.barUri
+end sub
+
+sub onLayoutFieldsChanged()
+    updateLayout()
+end sub
+
+sub onPositionChanged()
+    if not m.top.isSeeking
+        m.top.previewPosition = m.top.position
+    end if
+    updateLayout()
+end sub
+
+sub onIsSeekingChanged()
+    updateLayout()
+end sub
+
+sub updateLayout()
+    m.track.width = m.top.trackWidth
+    m.track.height = m.top.trackHeight
+    m.track.blendColor = m.top.trackColor
+
+    m.fill.height = m.top.trackHeight
+    m.fill.blendColor = m.top.fillColor
+
+    playhead = m.top.isSeeking ? m.top.previewPosition : m.top.position
+
+    if m.top.duration > 0
+        ratio = playhead / m.top.duration
+        if ratio > 1 then ratio = 1
+        if ratio < 0 then ratio = 0
+        m.fill.width = m.top.trackWidth * ratio
+    else
+        m.fill.width = 0
+    end if
+end sub

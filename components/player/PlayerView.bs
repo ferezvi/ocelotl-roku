@@ -20,7 +20,6 @@ sub init()
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
 
-    m.playerOSD = m.top.findNode("playerOSD")
     m.playerOSD.observeField("action", "onOSDAction")
 
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
@@ -35,6 +34,11 @@ sub init()
     m.loadContentTask.control = TaskControl.RUN
 
     m.top.observeField("state", "onStateChanged")
+    m.playerOSD.observeField("visible", "onOSDVisibilityChanged")
+
+    m.progressBar = m.playerOSD.findNode("progressBar")
+    m.top.observeField("position", "onVideoPositionChanged")
+    m.top.observeField("duration", "onVideoPositionChanged")
 
     m.top.setFocus(true)
 end sub
@@ -71,19 +75,30 @@ end sub
 
 sub onStateChanged()
     print "[PlayerView] state: "; m.top.state
-    m.playerOSD.isPlaying = isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+    m.playerOSD.playbackState = m.top.state
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
+    print "[PlayerOSD] onKeyEvent key="; key; " press="; press
+    if not press then return false
 
-    if press and key = KeyCode.OK
+    if m.playerOSD.visible
+        return false
+    end if
+
+    if isStringEqual(key, KeyCode.OK)
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
         return true
-    end if
-
-    if press and key = KeyCode.BACK
+    else if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.FASTFORWRD) or isStringEqual(key, KeyCode.REWIND)
+        m.playerOSD.visible = true
+        m.playerOSD.callFunc("focusProgressBar")
+        direction = (isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)) ? 1 : -1
+        m.progressBar.callFunc("seekStep", direction)
+        return true
+    else if isStringEqual(key, KeyCode.BACK)
         m.top.control = VideoControl.STOP
+        return true
     end if
 
     return false
@@ -106,6 +121,16 @@ sub onOSDAction(event as object)
         m.top.seek = max(0, m.top.position - SKIP_SECONDS)
     else if action = "skipForwardButton"
         m.top.seek = m.top.position + SKIP_SECONDS
+    else if action = "seek"
+        if m.playerOSD.seekPosition <> invalid
+            m.top.seek = m.playerOSD.seekPosition
+        end if
+    else if action = "seekStart"
+        m.top.control = VideoControl.PAUSE
+    else if action = "seekEnd"
+        m.top.control = VideoControl.RESUME
+    else if action = "hide"
+        hideOSD()
     end if
 end sub
 
@@ -113,3 +138,23 @@ function max(a as float, b as float) as float
     if a > b then return a
     return b
 end function
+
+sub onVideoPositionChanged()
+    progressBar = m.playerOSD.findNode("progressBar")
+    if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
+        progressBar.position = m.top.position
+        progressBar.duration = m.top.duration
+    end if
+end sub
+
+sub onOSDVisibilityChanged()
+    if not m.playerOSD.visible
+        m.top.setFocus(true)
+    end if
+end sub
+
+sub hideOSD()
+    m.playerOSD.setFocus(false)
+    m.top.setFocus(true)
+    m.playerOSD.visible = false
+end sub
