@@ -7,6 +7,7 @@
         <field id="action" type="string" alwaysNotify="true" />
         <field id="playbackState" type="string" onChange="onPlaybackStateChanged" />
         <function name="focusControls" />
+        <function name="clearFocus" />
     </interface>
 
     <children>

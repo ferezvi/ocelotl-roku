@@ -78,3 +78,10 @@ sub onPlaybackStateChanged()
         playPauseButton.icon = "pkg:/images/ui/player/play.png"
     end if
 end sub
+
+sub clearFocus()
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+        m.buttons[m.currentIndex].setFocus(false)
+    end if
+end sub

@@ -34,12 +34,19 @@ sub seekStep(direction as integer)
     end if
     m.seekHoldCount++
 
-    newPlayhead = m.top.previewPosition + (direction * currentStepSize())
+    seekStepValue = currentStepSize()
+    newPlayhead = m.top.previewPosition + (direction * seekStepValue)
+
     if newPlayhead > m.top.duration then newPlayhead = m.top.duration
     if newPlayhead < 0 then newPlayhead = 0
 
-    m.top.previewPosition = newPlayhead
+    ' Set seeking before previewPosition.
+    ' onPositionChanged() resets previewPosition from the real playback position
+    ' while isSeeking is false, so setting previewPosition first would immediately
+    ' overwrite the seek preview with the current playback position.
     m.top.isSeeking = true
+    m.top.previewPosition = newPlayhead
+
 end sub
 
 function currentStepSize() as integer
@@ -70,11 +77,15 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if not m.top.hasFocus() then return false
 
     if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)
-        if press then seekStep(1) else commitSeek()
+        if press
+            seekStep(1)
+        end if
         return true
 
     else if isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.REWIND)
-        if press then seekStep(-1) else commitSeek()
+        if press
+            seekStep(-1)
+        end if
         return true
 
     else if isStringEqual(key, KeyCode.OK) and press
