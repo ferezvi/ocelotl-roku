@@ -18,6 +18,7 @@ sub init()
     m.top.enableUI = false
     m.playerOSD = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
+    m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
 
@@ -40,8 +41,36 @@ sub init()
     m.progressBar = m.playerOSD.findNode("progressBar")
     m.top.observeField("position", "onVideoPositionChanged")
     m.top.observeField("duration", "onVideoPositionChanged")
+    m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
 
+    centerSpinnerPercentLabel()
     m.top.setFocus(true)
+end sub
+
+sub centerSpinnerPercentLabel()
+    spinnerWidth = m.playerSpinner.poster.bitmapWidth
+    spinnerHeight = m.playerSpinner.poster.bitmapHeight
+
+    m.spinnerPercentLabel.translation = [
+        m.playerSpinner.translation[0] + spinnerWidth / 2 - m.spinnerPercentLabel.width / 2,
+        m.playerSpinner.translation[1] + spinnerHeight / 2 - m.spinnerPercentLabel.height / 2
+    ]
+end sub
+
+sub onBufferingStatusChanged()
+    if m.top.state <> MediaPlaybackState.BUFFERING
+        return
+    end if
+
+    if isValid(m.top.bufferingStatus)
+        percentage = m.top.bufferingStatus["percentage"]
+
+        if isValid(percentage)
+            m.spinnerPercentLabel.text = percentage.ToStr() + "%"
+            centerSpinnerPercentLabel()
+            m.spinnerPercentLabel.visible = true
+        end if
+    end if
 end sub
 
 sub onVideoContentLoaded()
@@ -76,12 +105,14 @@ end sub
 
 sub onStateChanged()
     print "[PlayerView] state: "; m.top.state
-
     m.playerOSD.playbackState = m.top.state
+
     if m.top.state = MediaPlaybackState.BUFFERING
         m.playerSpinner.visible = true
+        m.spinnerPercentLabel.visible = true
     else
         m.playerSpinner.visible = false
+        m.spinnerPercentLabel.visible = false
     end if
 end sub
 
