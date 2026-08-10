@@ -10,7 +10,9 @@ const SEEK_HOLD_MAX_THRESHOLD = 14
 
 sub init()
     m.track = m.top.findNode("track")
+    m.previewForward = m.top.findNode("previewForward")
     m.fill = m.top.findNode("fill")
+    m.previewErase = m.top.findNode("previewErase")
     m.currentTime = m.top.findNode("currentTime")
     m.remainingTime = m.top.findNode("remainingTime")
 
@@ -156,7 +158,9 @@ end function
 
 sub onBarUriChanged()
     m.track.uri = m.top.barUri
+    m.previewForward.uri = m.top.barUri
     m.fill.uri = m.top.barUri
+    m.previewErase.uri = m.top.barUri
 end sub
 
 sub onLayoutFieldsChanged()
@@ -182,19 +186,61 @@ sub updateLayout()
     m.fill.height = m.top.trackHeight
     m.fill.blendColor = m.top.fillColor
 
-    playhead = m.top.isSeeking ? m.top.previewPosition : m.top.position
+    m.previewForward.height = m.top.trackHeight
+    m.previewForward.blendColor = m.top.previewFillColor
 
-    if m.top.duration > 0
-        ratio = playhead / m.top.duration
-        if ratio > 1 then ratio = 1
-        if ratio < 0 then ratio = 0
-        m.fill.width = m.top.trackWidth * ratio
+    m.previewErase.height = m.top.trackHeight
+    m.previewErase.blendColor = m.top.previewEraseColor
+
+    positionRatio = clampRatio(m.top.position, m.top.duration)
+    m.fill.width = m.top.trackWidth * positionRatio
+
+    if m.top.isSeeking
+        previewRatio = clampRatio(m.top.previewPosition, m.top.duration)
+
+        if previewRatio > positionRatio
+            ' Seeking forward: grow from 0, but sit BEHIND fill so only the
+            ' part past the real position peeks out - looks like the new
+            ' color emerges from underneath as you seek.
+            m.previewForward.translation = [0, 0]
+            m.previewForward.width = m.top.trackWidth * previewRatio
+            m.previewForward.opacity = 1
+            m.previewErase.width = 0
+            m.previewErase.opacity = 0
+
+        else if previewRatio < positionRatio
+            ' Seeking backward: sit ON TOP of fill and shrink from the real
+            ' position down to the preview target, painting over the
+            ' progress that would be lost - reads as "erasing" it.
+            m.previewErase.translation = [m.top.trackWidth * previewRatio, 0]
+            m.previewErase.width = m.top.trackWidth * (positionRatio - previewRatio)
+            m.previewForward.width = 0
+            m.previewForward.opacity = 0
+            m.previewErase.opacity = 1
+
+        else
+            m.previewForward.width = 0
+            m.previewForward.opacity = 0
+            m.previewErase.width = 0
+            m.previewErase.opacity = 0
+        end if
     else
-        m.fill.width = 0
+        m.previewForward.width = 0
+        m.previewForward.opacity = 0
+        m.previewErase.width = 0
+        m.previewErase.opacity = 0
     end if
 
-    updateTimeLabels(playhead)
+    updateTimeLabels(m.top.isSeeking ? m.top.previewPosition : m.top.position)
 end sub
+
+function clampRatio(value as float, total as float) as float
+    if total <= 0 then return 0
+    ratio = value / total
+    if ratio > 1 then ratio = 1
+    if ratio < 0 then ratio = 0
+    return ratio
+end function
 
 ' Updates elapsed/remaining time labels below the track. Mirrors the reference
 ' OSD: elapsed time uses the live playhead (previewPosition while seeking),
