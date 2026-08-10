@@ -38,8 +38,6 @@ end sub
 ' UP/DOWN switches focus between progress bar and controls, BACK closes the OSD
 ' (unless the progress bar is mid-seek, in which case it cancels the seek first)
 function onKeyEvent(key as string, press as boolean) as boolean
-    print "[PlayerOSD] onKeyEvent key="; key; " press="; press
-
     if not press then return false
 
     if isStringEqual(key, KeyCode.BACK) and m.progressBar.hasFocus() and m.progressBar.isSeeking
@@ -47,6 +45,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     if isStringEqual(key, KeyCode.UP)
+        m.videoControls.callFunc("clearFocus")
         m.progressBar.setFocus(true)
         return true
 
