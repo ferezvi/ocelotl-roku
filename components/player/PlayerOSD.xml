@@ -10,7 +10,7 @@
     </interface>
 
     <children>
-        <ProgressBar id="progressBar" translation="[672, 790]" />
+        <ProgressBar id="progressBar" translation="[106, 790]" />
         <VideoControls id="videoControls" translation="[672, 930]" />
     </children>
 

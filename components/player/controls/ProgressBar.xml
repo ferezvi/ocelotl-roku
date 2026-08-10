@@ -1,9 +1,9 @@
-<component name="ProgressBar" extends="Group" focusable="true">
+<component name="ProgressBar" extends="Group">
     <interface>
         <field id="barUri" type="uri" value="pkg:/images/ui/player/progress_bar_$$RES$$.9.png" onChange="onBarUriChanged" />
         <field id="trackColor" type="color" value="0xFFFFFF33" />
         <field id="fillColor" type="color" value="0x7C3AEDFF" />
-        <field id="trackWidth" type="float" value="800" onChange="onLayoutFieldsChanged" />
+        <field id="trackWidth" type="float" value="1714" onChange="onLayoutFieldsChanged" />
         <field id="trackHeight" type="float" value="12" onChange="onLayoutFieldsChanged" />
 
         <!-- Playback data -->

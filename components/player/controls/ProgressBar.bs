@@ -1,8 +1,8 @@
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
-const SEEK_STEP_SECONDS = 5
-const SEEK_STEP_FAST = 15
+const SEEK_STEP_SECONDS = 10
+const SEEK_STEP_FAST = 20
 const SEEK_STEP_MAX = 30
 const SEEK_HOLD_FAST_THRESHOLD = 6
 const SEEK_HOLD_MAX_THRESHOLD = 14
@@ -13,6 +13,11 @@ sub init()
 
     m.seekHoldCount = 0
     m.seekDirection = 0
+
+    m.seekRepeatTimer = CreateObject("roSGNode", "Timer")
+    m.seekRepeatTimer.duration = 0.5
+    m.seekRepeatTimer.repeat = true
+    m.seekRepeatTimer.observeField("fire", "onSeekRepeatTimerFire")
 
     onBarUriChanged()
     updateLayout()
@@ -47,6 +52,13 @@ sub seekStep(direction as integer)
     m.top.isSeeking = true
     m.top.previewPosition = newPlayhead
 
+    ' Only arm the repeat timer if it isn't already running - otherwise
+    ' onSeekRepeatTimerFire's own call to seekStep() would keep resetting
+    ' duration back to 0.5 on every tick and the repeat would never speed up.
+    if m.seekRepeatTimer.control <> "start"
+        m.seekRepeatTimer.duration = 0.5
+        m.seekRepeatTimer.control = "start"
+    end if
 end sub
 
 function currentStepSize() as integer
@@ -54,6 +66,21 @@ function currentStepSize() as integer
     if m.seekHoldCount >= SEEK_HOLD_FAST_THRESHOLD then return SEEK_STEP_FAST
     return SEEK_STEP_SECONDS
 end function
+
+' Fired repeatedly by m.seekRepeatTimer while a direction key is held.
+' Speeds up the repeat rate after the first tick, mirroring the official
+' client's 0.5s -> 0.125s acceleration.
+sub onSeekRepeatTimerFire()
+    m.seekRepeatTimer.duration = 0.15
+    seekStep(m.seekDirection)
+end sub
+
+' Stops the hold-to-seek repeat cycle. Does NOT commit the seek -
+' confirmation is still explicit via OK/BACK, matching the official client.
+sub stopSeekHold()
+    m.seekRepeatTimer.control = "stop"
+    m.seekRepeatTimer.duration = 0.5
+end sub
 
 ' Applies the previewed position as the real seek and clears seeking state
 sub commitSeek()
@@ -79,12 +106,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)
         if press
             seekStep(1)
+        else
+            stopSeekHold()
         end if
         return true
 
     else if isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.REWIND)
         if press
             seekStep(-1)
+        else
+            stopSeekHold()
         end if
         return true
 
