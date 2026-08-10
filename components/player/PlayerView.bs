@@ -17,6 +17,7 @@ const SKIP_SECONDS = 30
 sub init()
     m.top.enableUI = false
     m.playerOSD = m.top.findNode("playerOSD")
+    m.playerSpinner = m.top.findNode("playerSpinner")
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
 
@@ -75,7 +76,13 @@ end sub
 
 sub onStateChanged()
     print "[PlayerView] state: "; m.top.state
+
     m.playerOSD.playbackState = m.top.state
+    if m.top.state = MediaPlaybackState.BUFFERING
+        m.playerSpinner.visible = true
+    else
+        m.playerSpinner.visible = false
+    end if
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -98,6 +105,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     else if isStringEqual(key, KeyCode.BACK)
         m.top.control = VideoControl.STOP
+        m.global.sceneManager.callFunc("popScene")
         return true
     end if
 
