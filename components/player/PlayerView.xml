@@ -40,5 +40,6 @@
 
     <children>
         <PlayerOSD id="playerOSD" visible="false" />
+        <Spinner id="playerSpinner" visible="false" translation="[897, 477]" />
     </children>
 </component>
