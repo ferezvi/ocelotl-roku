@@ -5,7 +5,8 @@
         <field id="fillColor" type="color" value="0x7C3AEDFF" />
         <field id="trackWidth" type="float" value="1714" onChange="onLayoutFieldsChanged" />
         <field id="trackHeight" type="float" value="12" onChange="onLayoutFieldsChanged" />
-
+        <field id="previewFillColor" type="color" value="0x7C3AEDB3" onChange="onLayoutFieldsChanged" />
+        <field id="previewEraseColor" type="color" value="0xFFFFFF4D" onChange="onLayoutFieldsChanged" />
         <!-- Playback data -->
         <field id="position" type="float" value="0" onChange="onPositionChanged" />
         <field id="duration" type="float" value="0" />
@@ -20,7 +21,9 @@
 
     <children>
         <Poster id="track" />
+        <Poster id="previewForward" />
         <Poster id="fill" />
+        <Poster id="previewErase" />
         <Label id="currentTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" />
         <Label id="remainingTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" horizAlign="right" />
     </children>
