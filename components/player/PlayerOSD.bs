@@ -74,6 +74,7 @@ sub focusControls()
 end sub
 
 sub focusProgressBar()
+    m.videoControls.callFunc("clearFocus")
     m.progressBar.setFocus(true)
 end sub
 

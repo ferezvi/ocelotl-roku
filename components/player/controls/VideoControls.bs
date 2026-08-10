@@ -23,7 +23,7 @@ sub onItemSpacingChanged()
 end sub
 
 sub focusControls()
-    setFocusedIndex(m.currentIndex)
+    setFocusedIndex(2)
 end sub
 
 sub setFocusedIndex(index as integer)
@@ -49,18 +49,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if key = "right"
         if m.currentIndex < m.buttons.Count() - 1
             setFocusedIndex(m.currentIndex + 1)
-            return true
         end if
 
-        return false
+        return true
 
     else if key = "left"
         if m.currentIndex > 0
             setFocusedIndex(m.currentIndex - 1)
-            return true
         end if
 
-        return false
+        return true
     end if
 
     return false
