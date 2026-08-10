@@ -11,6 +11,7 @@
         <field id="duration" type="float" value="0" />
         <field id="previewPosition" type="float" value="0" />
         <field id="isSeeking" type="boolean" value="false" />
+        <field id="keyPressed" type="boolean" alwaysNotify="true" />
 
         <!-- Emitted when user confirms a seek -->
         <field id="seek" type="float" alwaysNotify="true" />

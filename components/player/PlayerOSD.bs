@@ -1,6 +1,8 @@
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
+const OSD_INACTIVITY_TIMEOUT_SECONDS = 5
+
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
@@ -8,10 +10,50 @@ sub init()
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
+    m.top.observeField("visible", "onVisibleChanged")
+    m.videoControls.observeField("keyPressed", "onKeyPressed")
+    m.progressBar.observeField("keyPressed", "onKeyPressed")
+
+    m.inactivityTimer = CreateObject("roSGNode", "Timer")
+    m.inactivityTimer.duration = OSD_INACTIVITY_TIMEOUT_SECONDS
+    m.inactivityTimer.observeField("fire", "onInactivityTimerFire")
+    m.top.appendChild(m.inactivityTimer)
+end sub
+
+' Restarts the OSD when it becomes visible (regardless of what triggered
+' the show) and stops it once the OSD is hidden, so it doesn't fire a
+' stray "hide" action while already hidden.
+sub onVisibleChanged()
+    if m.top.visible
+        resetInactivityTimer()
+    else
+        m.inactivityTimer.control = "stop"
+    end if
+end sub
+
+sub resetInactivityTimer()
+    m.inactivityTimer.control = "stop"
+    m.inactivityTimer.control = "start"
+end sub
+
+sub onInactivityTimerFire()
+    if m.top.visible
+        m.top.action = "hide"
+    end if
+end sub
+
+sub onKeyPressed()
+    resetInactivityTimer()
 end sub
 
 sub onProgressBarSeekingChanged()
     m.top.action = m.progressBar.isSeeking ? "seekStart" : "seekEnd"
+
+    if m.progressBar.isSeeking
+        m.inactivityTimer.control = "stop"
+    else
+        resetInactivityTimer()
+    end if
 end sub
 
 sub onVideoControlsAction(event as object)

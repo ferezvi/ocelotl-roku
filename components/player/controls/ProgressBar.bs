@@ -103,6 +103,11 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not m.top.hasFocus() then return false
 
+    if press
+        m.top.keyPressed = true
+        m.top.keyPressed = false
+    end if
+
     if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)
         if press
             seekStep(1)

@@ -11,7 +11,7 @@
 
     <children>
         <ProgressBar id="progressBar" translation="[106, 790]" />
-        <VideoControls id="videoControls" translation="[672, 930]" />
+        <VideoControls id="videoControls" translation="[768, 930]" />
     </children>
 
 </component>
