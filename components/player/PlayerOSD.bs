@@ -6,13 +6,16 @@ const OSD_INACTIVITY_TIMEOUT_SECONDS = 5
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
+    m.leftControls = m.top.findNode("leftControls")
 
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
     m.top.observeField("visible", "onVisibleChanged")
+
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
+    m.leftControls.observeField("keyPressed", "onKeyPressed")
 
     m.inactivityTimer = CreateObject("roSGNode", "Timer")
     m.inactivityTimer.duration = OSD_INACTIVITY_TIMEOUT_SECONDS
@@ -70,11 +73,13 @@ sub onIsPlayingChanged()
 end sub
 
 sub focusControls()
+    m.leftControls.callFunc("clearFocus")
     m.videoControls.callFunc("focusControls")
 end sub
 
 sub focusProgressBar()
     m.videoControls.callFunc("clearFocus")
+    m.leftControls.callFunc("clearFocus")
     m.progressBar.setFocus(true)
 end sub
 
@@ -97,6 +102,22 @@ function onKeyEvent(key as string, press as boolean) as boolean
             m.videoControls.callFunc("focusControls")
             return true
         end if
+
+    else if isStringEqual(key, KeyCode.LEFT) and m.videoControls.isInFocusChain()
+        m.videoControls.callFunc("clearFocus")
+        m.leftControls.callFunc("focusLast")
+        return true
+
+    else if isStringEqual(key, KeyCode.RIGHT) and m.leftControls.isInFocusChain()
+        m.leftControls.callFunc("clearFocus")
+        m.videoControls.callFunc("focusFirst")
+        return true
+
+    else if isStringEqual(key, KeyCode.RIGHT) and m.videoControls.isInFocusChain()
+        return true ' last button, nothing further right - absorb so it doesn't leak to the native video controls
+
+    else if isStringEqual(key, KeyCode.LEFT) and m.leftControls.isInFocusChain()
+        return true ' first button, nothing further left - absorb it too
 
     else if isStringEqual(key, KeyCode.BACK)
         m.top.action = "hide"

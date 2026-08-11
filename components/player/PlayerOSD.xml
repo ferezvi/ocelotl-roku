@@ -15,6 +15,7 @@
         <PlayerOSDTop id="topOSD" />
         <ProgressBar id="progressBar" translation="[106, 875]" />
         <VideoControls id="videoControls" translation="[768, 960]" />
+        <LeftControls id="leftControls" translation="[106, 960]" />
     </children>
 
 </component>

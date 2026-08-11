@@ -1,0 +1,76 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.buttons = [
+        m.top.findNode("mediaInfoButton"),
+        m.top.findNode("languageButton")
+    ]
+
+    m.currentIndex = 0
+
+    for each btn in m.buttons
+        btn.observeFieldScoped("buttonSelected", "onChildButtonSelected")
+    end for
+end sub
+
+sub setFocusedIndex(index as integer)
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+    end if
+
+    m.currentIndex = index
+    target = m.buttons[m.currentIndex]
+    target.focused = true
+    target.setFocus(true)
+end sub
+
+sub focusControls()
+    setFocusedIndex(0)
+end sub
+
+sub focusLast()
+    setFocusedIndex(m.buttons.Count() - 1)
+end sub
+
+sub clearFocus()
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+        m.buttons[m.currentIndex].setFocus(false)
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    ' Toggle key to fire OSD hide timer
+    m.top.keyPressed = true
+    m.top.keyPressed = false
+
+    if isStringEqual(key, KeyCode.RIGHT)
+        if m.currentIndex < m.buttons.Count() - 1
+            setFocusedIndex(m.currentIndex + 1)
+            return true
+        end if
+
+        return false ' bubble up so VideoControls can take focus
+
+    else if isStringEqual(key, KeyCode.LEFT)
+        if m.currentIndex > 0
+            setFocusedIndex(m.currentIndex - 1)
+            return true
+        end if
+
+        return false
+    end if
+
+    return false
+end function
+
+sub onChildButtonSelected(event as object)
+    node = event.getRoSGNode()
+
+    if event.getData() = true
+        print "[LeftControls] pressed: "; node.id
+    end if
+end sub
