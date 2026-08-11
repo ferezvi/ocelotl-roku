@@ -7,20 +7,18 @@ import "pkg:/source/utils/misc.bs"
 const SEEK_SECONDS = 10
 const SKIP_SECONDS = 30
 
-' Phase 1: minimal playback wiring only.
-'
-' Everything the legacy player handles beyond this - OSD, subtitle/audio
-' track switching, live TV, trickplay, chapters, retry/error recovery - is
-' intentionally left out here. Each of those will come back as its own
-' modular piece once basic playback is confirmed working end to end.
-
 sub init()
     m.top.enableUI = false
     m.playerOSD = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
+
+    stopLoadingSpinner()
+
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
+
+    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
 
     m.playerOSD.observeField("action", "onOSDAction")
 
@@ -47,6 +45,36 @@ sub init()
 
     centerSpinnerPercentLabel()
     m.top.setFocus(true)
+end sub
+
+sub onAvailableAudioTracksChanged()
+    if not isValidAndNotEmpty(m.top.availableAudioTracks) then return
+
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+
+    for each audioTrack in m.top.availableAudioTracks
+        trackName = audioTrack.LookupCI("name")
+
+        if isStringEqual(trackName, preferredAudioTrackName)
+            m.global.queueManager.callFunc("setPreferredAudioTrackIndex", audioTrack.LookupCI("Track").toint())
+            m.top.audioIndex = audioTrack.LookupCI("Track")
+
+            if m.top.currentAudioTrack = audioTrack.LookupCI("Track")
+                return
+            end if
+
+            if m.top.position <> 0
+                m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+            end if
+
+            m.top.control = VideoControl.STOP
+            m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
+            m.loadContentTask.itemId = m.top.id
+            m.loadContentTask.observeField("content", "onVideoContentLoaded")
+            m.loadContentTask.control = TaskControl.RUN
+            exit for
+        end if
+    end for
 end sub
 
 sub onTrackSelected()
@@ -90,6 +118,9 @@ sub onBufferingStatusChanged()
 end sub
 
 sub onVideoContentLoaded()
+
+    stopLoadingSpinner()
+
     m.loadContentTask.unobserveField("content")
     m.loadContentTask.control = TaskControl.STOP
 
@@ -115,6 +146,15 @@ sub onVideoContentLoaded()
     m.top.isTranscoded = item.isTranscoded
 
     m.top.content = item.content
+
+    ' Falls back to track 0 if audioIndex is somehow invalid on this load - Roku's
+    ' Video node needs *some* value here right after content is assigned, otherwise
+    ' it can end up playing the wrong audio track instead of the one requested
+    if isValid(item.audioIndex)
+        m.top.audioTrack = item.audioIndex.toStr()
+    else
+        m.top.audioTrack = "0"
+    end if
 
     m.playerOSD.fullAudioData = item.fullAudioData
     m.playerOSD.fullSubtitleData = item.fullSubtitleData
@@ -142,6 +182,7 @@ sub onVideoContentLoaded()
     end if
 
     m.topOSD.logoImage = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
+    stopLoadingSpinner()
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)
 end sub
