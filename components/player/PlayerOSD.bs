@@ -12,6 +12,7 @@ sub init()
 
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
+
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
     m.top.observeField("visible", "onVisibleChanged")
@@ -20,6 +21,7 @@ sub init()
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
     m.optionControls.observeField("keyPressed", "onKeyPressed")
+    m.languagePanel.observeField("keyPressed", "onKeyPressed")
 
     m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
     m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
@@ -47,6 +49,10 @@ sub resetInactivityTimer()
 end sub
 
 sub onInactivityTimerFire()
+    if m.languagePanel.visible
+        m.languagePanel.visible = false
+    end if
+
     if m.top.visible
         m.top.action = "hide"
     end if
@@ -83,10 +89,10 @@ sub onOptionControlsAction(event as object)
 end sub
 
 sub openLanguagePanel()
-    m.inactivityTimer.control = "stop"
     m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, m.top.audioIndex)
     m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, m.top.selectedSubtitleIndex)
     m.languagePanel.visible = true
+    resetInactivityTimer()
 end sub
 
 ' Adapter: raw Jellyfin audio streams -> { kind, index, selected, track: { description } }
@@ -144,7 +150,6 @@ end sub
 
 sub onLanguagePanelVisibleChanged()
     if not m.languagePanel.visible
-        resetInactivityTimer()
         m.optionControls.callFunc("focusControls")
     end if
 end sub

@@ -4,6 +4,7 @@
         <field id="audioContent" type="array" />
         <field id="subtitleContent" type="array" />
         <field id="selectionMade" type="assocarray" alwaysNotify="true" />
+        <field id="keyPressed" type="boolean" alwaysNotify="true" />
     </interface>
     <children>
         <Poster
