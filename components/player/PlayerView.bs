@@ -167,6 +167,9 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     if isStringEqual(key, KeyCode.OK)
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        end if
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
         return true
