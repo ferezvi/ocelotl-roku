@@ -1,0 +1,45 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.linesContainer = m.top.findNode("linesContainer")
+end sub
+
+sub onLinesChanged()
+    m.linesContainer.removeChildrenIndex(m.linesContainer.getChildCount(), 0)
+
+    if not isValidAndNotEmpty(m.top.lines) then return
+
+    for each line in m.top.lines
+        label = createObject("roSGNode", "Label")
+        label.width = 560
+        label.wrap = true
+
+        if line.isHeader
+            label.font = "font:MediumBoldSystemFont"
+            label.color = "0xFFFFFFFF"
+        else
+            label.font = "font:SmallSystemFont"
+            label.color = "0xCCCCCCFF"
+        end if
+
+        label.text = line.text
+        m.linesContainer.appendChild(label)
+    end for
+end sub
+
+' Read-only panel: only BACK does anything, still resets the shared
+' inactivity timer via keyPressed like every other OSD zone
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    m.top.keyPressed = true
+    m.top.keyPressed = false
+
+    if isStringEqual(key, KeyCode.BACK)
+        m.top.visible = false
+        return true
+    end if
+
+    return true ' absorb everything else - it's read-only, nothing to navigate
+end function

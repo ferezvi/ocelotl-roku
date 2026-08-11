@@ -26,6 +26,14 @@ sub init()
     m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
     m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
 
+    m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
+    m.mediaInfoPanel.observeField("keyPressed", "onKeyPressed")
+    m.mediaInfoPanel.observeField("visible", "onMediaInfoPanelVisibleChanged")
+
+    m.mediaInfoTask = createObject("roSGNode", "GetPlaybackInfoTask")
+    m.mediaInfoTask.observeField("data", "onPlaybackInfoLoaded")
+    m.top.appendChild(m.mediaInfoTask)
+
     m.inactivityTimer = CreateObject("roSGNode", "Timer")
     m.inactivityTimer.duration = OSD_INACTIVITY_TIMEOUT_SECONDS
     m.inactivityTimer.observeField("fire", "onInactivityTimerFire")
@@ -53,6 +61,10 @@ sub onInactivityTimerFire()
         m.languagePanel.visible = false
     end if
 
+    if m.mediaInfoPanel.visible
+        m.mediaInfoPanel.visible = false
+    end if
+
     if m.top.visible
         m.top.action = "hide"
     end if
@@ -76,15 +88,57 @@ sub onVideoControlsAction(event as object)
     m.top.action = event.getData()
 end sub
 
-' mediaInfoButton is still a TODO - languageButton opens the panel locally
-' and doesn't bubble up to PlayerView
 sub onOptionControlsAction(event as object)
     action = event.getData()
 
     if action = "languageButton"
         openLanguagePanel()
     else if action = "mediaInfoButton"
-        print "[PlayerOSD] mediaInfoButton pressed" ' TODO: media info panel
+        openMediaInfoPanel()
+    end if
+end sub
+
+sub openMediaInfoPanel()
+    m.mediaInfoPanel.lines = [{ text: tr("Loading..."), isHeader: false }]
+    m.mediaInfoPanel.visible = true
+    resetInactivityTimer()
+
+    m.mediaInfoTask.videoID = m.top.itemId
+    m.mediaInfoTask.control = "RUN"
+end sub
+
+sub onPlaybackInfoLoaded()
+    data = m.mediaInfoTask.data
+    if not isValid(data) or not isValid(data.playbackInfo) then return
+
+    m.mediaInfoPanel.lines = parsePlaybackInfoLines(data.playbackInfo.data)
+end sub
+
+' Adapter: strips the <header>/<b> markup GetPlaybackInfoTask builds for the
+' legacy standardDialog, since our Label-based MediaInfoPanel can't render HTML
+function parsePlaybackInfoLines(rawLines as object) as object
+    lines = []
+
+    if not isValidAndNotEmpty(rawLines) then return lines
+
+    for each raw in rawLines
+        text = raw
+        isHeader = Instr(1, text, "<header>") > 0
+
+        text = text.Replace("<header>", "")
+        text = text.Replace("</header>", "")
+        text = text.Replace("<b>", "")
+        text = text.Replace("</b>", "")
+
+        lines.push({ text: text, isHeader: isHeader })
+    end for
+
+    return lines
+end function
+
+sub onMediaInfoPanelVisibleChanged()
+    if not m.mediaInfoPanel.visible
+        m.optionControls.callFunc("focusControls")
     end if
 end sub
 
