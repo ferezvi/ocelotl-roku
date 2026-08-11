@@ -16,10 +16,10 @@ end sub
 function getSizeTable() as object
     return {
         extrasmall: { container: 32, icon: 20 },
-        small: { container: 40, icon: 24 },
-        medium: { container: 56, icon: 24 },
-        large: { container: 96, icon: 32 },
-        extralarge: { container: 136, icon: 40 }
+        small: { container: 44, icon: 24 },
+        medium: { container: 50, icon: 28 },
+        large: { container: 58, icon: 32 },
+        extralarge: { container: 72, icon: 40 }
     }
 end function
 

@@ -150,6 +150,14 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
         return true
+    else if isStringEqual(key, KeyCode.UP)
+        m.playerOSD.visible = true
+        m.playerOSD.callFunc("focusOptionControls")
+        return true
+    else if isStringEqual(key, KeyCode.DOWN)
+        m.playerOSD.visible = true
+        m.playerOSD.callFunc("focusControls")
+        return true
     else if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.FASTFORWRD) or isStringEqual(key, KeyCode.REWIND)
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusProgressBar")

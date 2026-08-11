@@ -4,6 +4,7 @@
     <interface>
         <function name="focusControls" />
         <function name="focusProgressBar" />
+        <function name="focusOptionControls" />
         <field id="action" type="string" alwaysNotify="true" />
         <field id="seekPosition" type="float" />
         <field id="playbackState" type="string" />
@@ -13,9 +14,9 @@
         <Poster id="topGradient" uri="pkg:/images/ui/gradientes/top_gradient.png" translation="[0, 0]" width="1920" height="360" />
         <Poster id="bottomGradient" uri="pkg:/images/ui/gradientes/bottom_gradient.png" translation="[0, 720]" width="1920" height="360" />
         <PlayerOSDTop id="topOSD" />
+        <OptionControls id="optionControls" translation="[103, 200]" />
         <ProgressBar id="progressBar" translation="[106, 875]" />
         <VideoControls id="videoControls" translation="[768, 960]" />
-        <LeftControls id="leftControls" translation="[106, 960]" />
     </children>
 
 </component>

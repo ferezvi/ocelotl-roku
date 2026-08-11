@@ -6,7 +6,7 @@ const OSD_INACTIVITY_TIMEOUT_SECONDS = 5
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
-    m.leftControls = m.top.findNode("leftControls")
+    m.optionControls = m.top.findNode("optionControls")
 
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.progressBar.observeField("seek", "onProgressBarSeek")
@@ -15,7 +15,7 @@ sub init()
 
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
-    m.leftControls.observeField("keyPressed", "onKeyPressed")
+    m.optionControls.observeField("keyPressed", "onKeyPressed")
 
     m.inactivityTimer = CreateObject("roSGNode", "Timer")
     m.inactivityTimer.duration = OSD_INACTIVITY_TIMEOUT_SECONDS
@@ -73,14 +73,19 @@ sub onIsPlayingChanged()
 end sub
 
 sub focusControls()
-    m.leftControls.callFunc("clearFocus")
+    m.optionControls.callFunc("clearFocus")
     m.videoControls.callFunc("focusControls")
 end sub
 
 sub focusProgressBar()
     m.videoControls.callFunc("clearFocus")
-    m.leftControls.callFunc("clearFocus")
+    m.optionControls.callFunc("clearFocus")
     m.progressBar.setFocus(true)
+end sub
+
+sub focusOptionControls()
+    m.videoControls.callFunc("clearFocus")
+    m.optionControls.callFunc("focusControls")
 end sub
 
 ' UP/DOWN switches focus between progress bar and controls, BACK closes the OSD
@@ -93,31 +98,44 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     if isStringEqual(key, KeyCode.UP)
-        m.videoControls.callFunc("clearFocus")
-        m.progressBar.setFocus(true)
-        return true
+        if m.videoControls.isInFocusChain()
+            m.videoControls.callFunc("clearFocus")
+            m.progressBar.setFocus(true)
+            return true
+
+        else if m.progressBar.hasFocus()
+            m.progressBar.setFocus(false)
+            m.optionControls.callFunc("focusControls")
+            return true
+        end if
 
     else if isStringEqual(key, KeyCode.DOWN)
-        if m.progressBar.hasFocus()
+        if m.optionControls.isInFocusChain()
+            m.optionControls.callFunc("clearFocus")
+            m.progressBar.setFocus(true)
+            return true
+
+        else if m.progressBar.hasFocus()
+            m.progressBar.setFocus(false)
             m.videoControls.callFunc("focusControls")
             return true
         end if
 
     else if isStringEqual(key, KeyCode.LEFT) and m.videoControls.isInFocusChain()
         m.videoControls.callFunc("clearFocus")
-        m.leftControls.callFunc("focusLast")
+        m.optionControls.callFunc("focusLast")
         return true
 
-    else if isStringEqual(key, KeyCode.RIGHT) and m.leftControls.isInFocusChain()
-        m.leftControls.callFunc("clearFocus")
+    else if isStringEqual(key, KeyCode.RIGHT) and m.optionControls.isInFocusChain()
+        m.optionControls.callFunc("clearFocus")
         m.videoControls.callFunc("focusFirst")
         return true
 
     else if isStringEqual(key, KeyCode.RIGHT) and m.videoControls.isInFocusChain()
-        return true ' last button, nothing further right - absorb so it doesn't leak to the native video controls
+        return true ' last button, nothing further right - absorb it
 
-    else if isStringEqual(key, KeyCode.LEFT) and m.leftControls.isInFocusChain()
-        return true ' first button, nothing further left - absorb it too
+    else if isStringEqual(key, KeyCode.LEFT) and m.optionControls.isInFocusChain()
+        return true ' first button, nothing further left - absorb it
 
     else if isStringEqual(key, KeyCode.BACK)
         m.top.action = "hide"

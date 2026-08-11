@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<component name="LeftControls" extends="Group">
+<component name="OptionControls" extends="Group">
     <interface>
         <function name="focusControls" />
         <function name="focusLast" />
@@ -10,8 +10,8 @@
 
     <children>
         <LayoutGroup id="row" layoutDirection="horizontal" itemSpacings="[16]" vertAlignment="center">
-            <MDIconButton id="mediaInfoButton" size="Medium" icon="pkg:/images/ui/player/info.png" />
-            <MDIconButton id="languageButton" size="Medium" icon="pkg:/images/ui/player/languages.png" />
+            <MDIconButton id="mediaInfoButton" size="Large" icon="pkg:/images/ui/player/info.png" />
+            <MDIconButton id="languageButton" size="Large" icon="pkg:/images/ui/player/languages.png" />
         </LayoutGroup>
     </children>
 </component>

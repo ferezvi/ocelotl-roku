@@ -1,6 +1,8 @@
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
+const TOPLEFT_CONTROLS_TOP_PADDING = 24
+
 sub init()
     m.buttons = [
         m.top.findNode("mediaInfoButton"),
@@ -12,6 +14,7 @@ sub init()
     for each btn in m.buttons
         btn.observeFieldScoped("buttonSelected", "onChildButtonSelected")
     end for
+
 end sub
 
 sub setFocusedIndex(index as integer)
