@@ -40,12 +40,27 @@ sub init()
 
     m.progressBar = m.playerOSD.findNode("progressBar")
     m.topOSD = m.playerOSD.findNode("topOSD")
+    m.playerOSD.observeField("trackSelected", "onTrackSelected")
     m.top.observeField("position", "onVideoPositionChanged")
     m.top.observeField("duration", "onVideoPositionChanged")
     m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
 
     centerSpinnerPercentLabel()
     m.top.setFocus(true)
+end sub
+
+sub onTrackSelected()
+    selection = m.playerOSD.trackSelected
+    if not isValid(selection) then return
+
+    if selection.kind = "audio"
+        ' TODO: switching audio requires reloading playback with the new
+        ' selectedAudioStreamIndex (see LoadVideoContentTask), preserving position
+        print "[PlayerView] audio track selected: "; selection.index
+    else if selection.kind = "subtitle"
+        ' TODO: apply the new subtitle index to the active subtitle renderer
+        print "[PlayerView] subtitle track selected: "; selection.index
+    end if
 end sub
 
 sub centerSpinnerPercentLabel()
@@ -100,6 +115,11 @@ sub onVideoContentLoaded()
     m.top.isTranscoded = item.isTranscoded
 
     m.top.content = item.content
+
+    m.playerOSD.fullAudioData = item.fullAudioData
+    m.playerOSD.fullSubtitleData = item.fullSubtitleData
+    m.playerOSD.audioIndex = item.audioIndex
+    m.playerOSD.selectedSubtitleIndex = item.SelectedSubtitle
 
     ' TODO: Live TV will use its own OSD model instead of PlayerOSDTop
     if item.content.live

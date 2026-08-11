@@ -29,6 +29,13 @@ sub setFocusedIndex(index as integer)
 end sub
 
 sub focusControls()
+    for i = 0 to m.buttons.Count() - 1
+        if m.buttons[i].id = "languageButton"
+            setFocusedIndex(i)
+            return
+        end if
+    end for
+
     setFocusedIndex(0)
 end sub
 
@@ -74,6 +81,6 @@ sub onChildButtonSelected(event as object)
     node = event.getRoSGNode()
 
     if event.getData() = true
-        print "[LeftControls] pressed: "; node.id
+        m.top.action = node.id
     end if
 end sub

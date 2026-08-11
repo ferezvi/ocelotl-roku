@@ -1,0 +1,144 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+
+    m.audioButtons = m.top.findNode("audioButtons")
+    m.subtitleButtons = m.top.findNode("subtitleButtons")
+
+    m.top.observeField("audioContent", "onAudioContentChanged")
+    m.top.observeField("subtitleContent", "onSubtitleContentChanged")
+    m.top.observeField("visible", "onVisibleChanged")
+
+    m.focusColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+
+    m.audioData = []
+    m.subtitleData = []
+    m.focusedColumn = "audio"
+    m.focusedIndex = 0
+
+end sub
+
+' onAudioContentChanged: Rebuilds the Audio column's button list from m.top.audioContent
+'
+sub onAudioContentChanged()
+    m.audioData = m.top.audioContent
+    populateColumn(m.audioButtons, m.audioData)
+end sub
+
+' onSubtitleContentChanged: Rebuilds the Subtitles column's button list from m.top.subtitleContent
+'
+sub onSubtitleContentChanged()
+    m.subtitleData = m.top.subtitleContent
+    populateColumn(m.subtitleButtons, m.subtitleData)
+end sub
+
+' populateColumn: Clears and repopulates a ButtonGroup with StandardButtons based on the
+' given content array. Prefixes the currently-selected item's text with a checkmark,
+' mirroring the HBO Max reference layout.
+'
+sub populateColumn(buttonGroup as object, data as object)
+    buttonGroup.removeChildrenIndex(buttonGroup.getChildCount(), 0)
+
+    for each item in data
+        button = createObject("roSGNode", "StandardButton")
+        isSelected = isValid(item.selected) and item.selected
+        button.text = isSelected ? Chr(&h2713) + " " + item.track.description : item.track.description
+        button.height = 44
+        button.width = 380
+        button.fontSize = 26
+        button.background = "0x00000000"
+        button.focusBackground = m.focusColor
+        button.color = ColorPalette.WHITE
+        button.focusColor = ColorPalette.WHITE
+        buttonGroup.appendChild(button)
+    end for
+end sub
+
+' onVisibleChanged: Resets focus to the first item of the Audio column whenever the panel is shown
+'
+sub onVisibleChanged()
+    if not m.top.visible then return
+
+    m.focusedColumn = "audio"
+    m.focusedIndex = 0
+    setColumnFocus()
+    m.top.setFocus(true)
+end sub
+
+' setColumnFocus: Applies the .focus state to the currently tracked column/index,
+' clearing any stale focus from the other column first
+'
+sub setColumnFocus()
+    for each child in m.audioButtons.getChildren(-1, 0)
+        child.focus = false
+    end for
+    for each child in m.subtitleButtons.getChildren(-1, 0)
+        child.focus = false
+    end for
+
+    activeGroup = m.focusedColumn = "audio" ? m.audioButtons : m.subtitleButtons
+    if activeGroup.getChildCount() = 0 then return
+
+    if m.focusedIndex >= activeGroup.getChildCount() then m.focusedIndex = activeGroup.getChildCount() - 1
+    btn = activeGroup.getChild(m.focusedIndex)
+    btn.focus = true
+    btn.setFocus(true)
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    activeGroup = m.focusedColumn = "audio" ? m.audioButtons : m.subtitleButtons
+    activeData = m.focusedColumn = "audio" ? m.audioData : m.subtitleData
+
+    if key = "up"
+        if m.focusedIndex > 0
+            m.focusedIndex--
+            setColumnFocus()
+        end if
+        return true
+    end if
+
+    if key = "down"
+        if m.focusedIndex < activeGroup.getChildCount() - 1
+            m.focusedIndex++
+            setColumnFocus()
+        end if
+        return true
+    end if
+
+    if key = "right"
+        if m.focusedColumn = "audio" and m.subtitleButtons.getChildCount() > 0
+            m.focusedColumn = "subtitle"
+            m.focusedIndex = 0
+            setColumnFocus()
+        end if
+        return true
+    end if
+
+    if key = "left"
+        if m.focusedColumn = "subtitle"
+            m.focusedColumn = "audio"
+            m.focusedIndex = 0
+            setColumnFocus()
+        end if
+        return true
+    end if
+
+    if key = "OK"
+        if activeData.count() > 0
+            m.top.selectionMade = activeData[m.focusedIndex]
+        end if
+        m.top.visible = false
+        return true
+    end if
+
+    if key = "back"
+        m.top.setFocus(false)
+        m.top.visible = false
+        return true
+    end if
+
+    return false
+end function
