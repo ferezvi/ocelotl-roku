@@ -48,7 +48,7 @@ sub getPlaybackInfoTask()
     if isValid(sessions) and sessions.Count() > 0
         m.top.data = { playbackInfo: GetTranscodingStats(sessions[0]) }
     else
-        m.top.data = { playbackInfo: { data: ["<b>" + tr("Unable to get playback information" + "</b>")] } }
+        m.top.data = { playbackInfo: { data: ["<b>" + tr("Unable to get playback information") + "</b>"] } }
     end if
 end sub
 
