@@ -127,8 +127,12 @@ end sub
 ' ------------------------------------------------------------
 
 sub openLanguagePanel()
-    m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, m.top.audioIndex)
-    m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, m.top.selectedSubtitleIndex)
+    playerView = m.top.getParent()
+    selectedAudioIndex = isValid(playerView) ? playerView.selectedAudioIndex : m.top.audioIndex
+    selectedSubtitleIndex = isValid(playerView) ? playerView.SelectedSubtitle : m.top.selectedSubtitleIndex
+
+    m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, selectedAudioIndex)
+    m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, selectedSubtitleIndex)
     m.languagePanel.visible = true
     resetInactivityTimer()
 end sub
@@ -195,7 +199,8 @@ sub onLanguagePanelSelection()
 
     if isStringEqual(selection.kind, "audio")
         playerView = m.top.getParent()
-        resolvedIndex = selection.index ' fallback if no match is found
+        jellyfinIndex = selection.index
+        resolvedIndex = selection.index ' fallback si no hay match
 
         if isValid(playerView) and isValid(playerView.availableAudioTracks)
             for each audioTrack in playerView.availableAudioTracks
@@ -207,6 +212,7 @@ sub onLanguagePanelSelection()
         end if
 
         selection.index = resolvedIndex
+        selection.jellyfinIndex = jellyfinIndex
     end if
 
     m.top.trackSelected = selection

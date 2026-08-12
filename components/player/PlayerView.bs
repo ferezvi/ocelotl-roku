@@ -1,5 +1,6 @@
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/misc.bs"
@@ -35,7 +36,8 @@ sub init()
     m.top.id = currentItem.id
 
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
-    m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : -2
+    m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NOTSET
+    m.top.selectedAudioIndex = currentItem.selectedAudioStreamIndex
 
     m.loadContentTask = CreateObject("roSGNode", "LoadVideoContentTask")
     m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
@@ -86,6 +88,8 @@ sub onVideoContentLoaded()
     else
         m.top.audioTrack = "0"
     end if
+
+    applySubtitleContent(item)
 
     m.playerOSD.fullAudioData = item.fullAudioData
     m.playerOSD.fullSubtitleData = item.fullSubtitleData
@@ -156,10 +160,6 @@ end sub
 ' Audio track selection
 ' ------------------------------------------------------------
 
-' onAvailableAudioTracksChanged: Applies the user's preferred audio track
-' (by name) as soon as the Video node reports which tracks are available -
-' used for the initial "auto-select preferred language" behavior, not for
-' manual selection from the OSD (that goes through onTrackSelected).
 sub onAvailableAudioTracksChanged()
     if not isValidAndNotEmpty(m.top.availableAudioTracks) then return
 
@@ -175,8 +175,6 @@ sub onAvailableAudioTracksChanged()
             m.global.queueManager.callFunc("setPreferredAudioTrackIndex", rokuTrackIndex)
             m.top.audioIndex = rokuTrackIndex
 
-            ' currentAudioTrack is a string field on the Video node - compare
-            ' against the raw string, not the converted integer
             if m.top.currentAudioTrack = rokuTrackString then return
 
             if m.top.position <> 0
@@ -193,21 +191,25 @@ sub onAvailableAudioTracksChanged()
     end for
 end sub
 
-' onTrackSelected: Manual selection from the OSD (LanguagePanel or legacy dialog).
+' onTrackSelected: Manual selection from the OSD (LanguagePanel). For audio,
 ' desiredIndex must already be in Roku's native Track scale, not Jellyfin's
 ' stream Index - the caller (PlayerOSD) is responsible for that conversion.
+' For subtitles, just set SelectedSubtitle (Jellyfin's Index scale) and let
+' onSubtitleChange decide whether a reload is actually needed.
 sub onTrackSelected()
     selection = m.playerOSD.trackSelected
     if not isValid(selection) then return
 
     if selection.kind = "audio"
-        switchAudioTrack(selection.index)
+        switchAudioTrack(selection.index, selection.jellyfinIndex)
     else if selection.kind = "subtitle"
-        ' TODO: subtitle switching
+        applySubtitleTrackFields(selection.index, m.top.fullSubtitleData)
+        m.top.SelectedSubtitle = selection.index
     end if
 end sub
 
-sub switchAudioTrack(desiredIndex as integer)
+sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
+    m.top.selectedAudioIndex = jellyfinIndex
     if desiredIndex = m.top.audioIndex then return
 
     if m.top.position <> 0
@@ -220,6 +222,97 @@ sub switchAudioTrack(desiredIndex as integer)
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 end sub
+
+' ------------------------------------------------------------
+' Subtitle track selection
+' ------------------------------------------------------------
+
+' applySubtitleContent: Applies the subtitle selection that came back with
+' this content load onto the native Video node fields.
+sub applySubtitleContent(item as object)
+    m.top.unobserveField("SelectedSubtitle")
+
+    applySubtitleTrackFields(item.SelectedSubtitle, item.fullSubtitleData)
+
+    if m.top.SelectedSubtitle <> item.SelectedSubtitle
+        m.top.SelectedSubtitle = item.SelectedSubtitle
+    end if
+
+    m.top.observeField("SelectedSubtitle", "onSubtitleChange")
+end sub
+
+' applySubtitleTrackFields: Resolves the given Jellyfin subtitle Index against
+' fullSubtitleData/availableSubtitleTracks and updates the native Video node
+' fields (subtitleTrack, globalCaptionMode, previousSubtitleWasEncoded).
+' Must run BEFORE SelectedSubtitle is assigned - onSubtitleChange only reads
+' these fields to decide whether a reload is needed, it does not set them.
+sub applySubtitleTrackFields(subtitleIndex as integer, subtitleData as object)
+    selectedSubtitle = invalid
+    for each subtitle in subtitleData
+        if subtitle.Index = subtitleIndex
+            selectedSubtitle = subtitle
+            exit for
+        end if
+    end for
+
+    if subtitleIndex = SubtitleSelection.NONE
+        m.top.globalCaptionMode = "Off"
+        m.top.subtitleTrack = ""
+    else if isValid(selectedSubtitle) and not selectedSubtitle.IsEncoded
+        availableSubtitleTrackIndex = availSubtitleTrackIdx(selectedSubtitle.Track.TrackName)
+        if availableSubtitleTrackIndex <> SubtitleSelection.NONE
+            m.top.globalCaptionMode = "On"
+            m.top.subtitleTrack = m.top.availableSubtitleTracks[availableSubtitleTrackIndex].TrackName
+        end if
+    end if
+
+    m.top.previousSubtitleWasEncoded = isValid(selectedSubtitle) and selectedSubtitle.IsEncoded
+end sub
+
+' onSubtitleChange: Fires whenever SelectedSubtitle changes (from the
+' LanguagePanel or elsewhere). Most subtitle switches don't need a video
+' reload since Roku renders them natively via subtitleTrack/globalCaptionMode -
+' a reload is only required when switching to or from an "encoded" subtitle
+' (one Roku can't render natively), since that changes which stream must be
+' requested from the server.
+sub onSubtitleChange()
+    print "[SUB] onSubtitleChange FIRED, SelectedSubtitle="; m.top.SelectedSubtitle; " globalCaptionMode="; m.top.globalCaptionMode; " previousSubtitleWasEncoded="; m.top.previousSubtitleWasEncoded
+
+    switchWithoutRefresh = true
+
+    if m.top.SelectedSubtitle <> SubtitleSelection.NONE
+        if LCase(m.top.globalCaptionMode) <> "on" then switchWithoutRefresh = false
+    end if
+
+    if m.top.previousSubtitleWasEncoded then switchWithoutRefresh = false
+
+    print "[SUB] switchWithoutRefresh = "; switchWithoutRefresh
+
+    if switchWithoutRefresh then return
+
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    print "[SUB] Reloading with selectedSubtitleIndex = "; m.top.SelectedSubtitle
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub
+
+' availSubtitleTrackIdx: Roku may reorder or drop subtitle tracks it doesn't
+' understand, so translate our subtitle track name into Roku's own index
+' within availableSubtitleTracks rather than assuming they line up.
+function availSubtitleTrackIdx(trackNameToFind as string) as integer
+    idx = 0
+    for each availTrack in m.top.availableSubtitleTracks
+        if Instr(1, availTrack.TrackName, trackNameToFind) then return idx
+        idx = idx + 1
+    end for
+    return SubtitleSelection.NONE
+end function
 
 ' ------------------------------------------------------------
 ' OSD / input handling
@@ -303,7 +396,7 @@ sub hideOSD()
 end sub
 
 ' ------------------------------------------------------------
-' Helpers
+' Focus helpers
 ' ------------------------------------------------------------
 
 sub centerSpinnerPercentLabel()
