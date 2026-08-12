@@ -33,7 +33,6 @@ sub init()
 
     m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
     m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
-    m.mediaInfoPanel.observeField("visible", "onMediaInfoPanelVisibleChanged")
 
     m.mediaInfoTask = createObject("roSGNode", "GetPlaybackInfoTask")
     m.mediaInfoTask.observeField("data", "onPlaybackInfoLoaded")
@@ -124,7 +123,7 @@ sub onOptionControlsAction(event as object)
     if action = "languageButton"
         openLanguagePanel()
     else if action = "mediaInfoButton"
-        openMediaInfoPanel()
+        toggleMediaInfoPanel()
     else if action = "infoButton"
         toggleSynopsisPanel()
     end if
@@ -249,7 +248,12 @@ end sub
 ' Media info panel
 ' ------------------------------------------------------------
 
-sub openMediaInfoPanel()
+sub toggleMediaInfoPanel()
+    if m.mediaInfoPanel.visible
+        m.mediaInfoPanel.visible = false
+        return
+    end if
+
     m.mediaInfoPanel.lines = [{ text: tr("Loading..."), isHeader: false }]
     m.mediaInfoPanel.visible = true
     resetInactivityTimer()
@@ -286,12 +290,6 @@ function parsePlaybackInfoLines(rawLines as object) as object
 
     return lines
 end function
-
-sub onMediaInfoPanelVisibleChanged()
-    if not m.mediaInfoPanel.visible
-        m.optionControls.callFunc("focusControls")
-    end if
-end sub
 
 ' ------------------------------------------------------------
 ' Focus helpers
@@ -358,6 +356,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     else if isStringEqual(key, KeyCode.BACK)
         m.synopsisPanel.visible = false
+        m.mediaInfoPanel.visible = false
         m.top.action = "hide"
         return true
     end if
