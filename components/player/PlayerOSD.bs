@@ -90,13 +90,74 @@ end sub
 
 sub onOptionControlsAction(event as object)
     action = event.getData()
-
     if action = "languageButton"
-        openLanguagePanel()
-    else if action = "mediaInfoButton"
-        openMediaInfoPanel()
+        ' En lugar de abrir LanguagePanel, usa el diálogo legacy
+        openLegacyAudioDialog()
     end if
 end sub
+
+sub openLegacyAudioDialog()
+    ' Construir audioData igual que ViewCreator
+    audioData = { data: [] }
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+
+    for each stream in m.top.fullAudioData
+        item = {
+            "Index": stream.Index,
+            "RokuTrackName": stream.RokuTrackName,
+            "IsExternal": stream.IsExternal,
+            "Track": { "description": stream.DisplayTitle },
+            "Type": "audioselection"
+        }
+        if isStringEqual(stream.RokuTrackName, preferredAudioTrackName)
+            item.selected = true
+        end if
+        audioData.data.push(item)
+    end for
+
+    ' Llamar al diálogo legacy
+    m.global.sceneManager.callFunc("radioDialog", tr("Select Audio"), audioData)
+    m.global.sceneManager.observeField("returnData", "onLegacyAudioSelected")
+end sub
+
+' onLegacyAudioSelected: Procesa la selección del diálogo legacy y la reenvía
+' por el mismo camino que ya usa el LanguagePanel (m.top.trackSelected ->
+' PlayerView.onTrackSelected -> switchAudioTrack).
+'
+' IMPORTANTE: m.top.audioIndex en PlayerView.bs vive en la escala nativa
+' de Roku (el "Track" de availableAudioTracks), NO en la escala de Jellyfin
+' (el "Index" de fullAudioData/selection). switchAudioTrack compara
+' desiredIndex contra m.top.audioIndex directamente, asi que hay que
+' convertir selection.RokuTrackName -> Track de Roku antes de emitirlo,
+' o si no la comparacion "desiredIndex = m.top.audioIndex" puede coincidir
+' por casualidad numerica entre dos escalas distintas y no hacer nada.
+sub onLegacyAudioSelected()
+    m.global.sceneManager.unobserveField("returnData")
+    selection = m.global.sceneManager.returnData
+    if not isValid(selection) or selection.Type <> "audioselection" then return
+
+    m.global.queueManager.callFunc("setPreferredAudioTrackName", selection.RokuTrackName)
+
+    playerView = m.top.getParent()
+    resolvedIndex = selection.Index ' fallback si no hay match (misma logica legacy)
+
+    if isValid(playerView) and isValid(playerView.availableAudioTracks)
+        for each audioTrack in playerView.availableAudioTracks
+            if isStringEqual(audioTrack.LookupCI("name"), selection.RokuTrackName)
+                resolvedIndex = audioTrack.LookupCI("Track").toint()
+                exit for
+            end if
+        end for
+    end if
+
+    m.top.trackSelected = {
+        kind: "audio",
+        index: resolvedIndex
+    }
+end sub
+
+
+
 
 sub openMediaInfoPanel()
     m.mediaInfoPanel.lines = [{ text: tr("Loading..."), isHeader: false }]
@@ -143,17 +204,20 @@ sub onMediaInfoPanelVisibleChanged()
 end sub
 
 sub openLanguagePanel()
+    print "[PlayerOSD] openLanguagePanel called"
+    print "[PlayerOSD] fullAudioData count: "; m.top.fullAudioData.count()
     m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, m.top.audioIndex)
     m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, m.top.selectedSubtitleIndex)
     m.languagePanel.visible = true
     resetInactivityTimer()
 end sub
 
-' Adapter: raw Jellyfin audio streams -> { kind, index, selected, track: { description } }
-' that LanguagePanel already knows how to render
+' ============================================================
+' MODIFICADO: AÑADIR trackName
+' ============================================================
 function buildAudioContent(streams as object, selectedIndex as integer) as object
+    print "[PlayerOSD] buildAudioContent called, streams count: "; streams.count()
     result = []
-
     if not isValidAndNotEmpty(streams) then return result
 
     for each stream in streams
@@ -164,7 +228,8 @@ function buildAudioContent(streams as object, selectedIndex as integer) as objec
             kind: "audio",
             index: stream.Index,
             selected: (stream.Index = selectedIndex),
-            track: { description: label }
+            track: { description: label },
+            trackName: stream.RokuTrackName ' <--- NUEVO
         })
     end for
 
@@ -195,11 +260,17 @@ function buildSubtitleContent(subtitles as object, selectedIndex as integer) as 
     return result
 end function
 
+' ============================================================
+' MODIFICADO: PROCESAR SELECCIÓN Y ACTUALIZAR REPRODUCTOR
+' ============================================================
 sub onLanguagePanelSelection()
     selection = m.languagePanel.selectionMade
+    print "[PlayerOSD] onLanguagePanelSelection received: "; selection
     if not isValid(selection) then return
 
+    ' Emitir la selección hacia PlayerView
     m.top.trackSelected = selection
+    print "[PlayerOSD] trackSelected emitted to PlayerView" ' El panel permanece abierto
 end sub
 
 sub onLanguagePanelVisibleChanged()
@@ -279,5 +350,3 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
-
-

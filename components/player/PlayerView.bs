@@ -12,6 +12,8 @@ sub init()
     m.playerOSD = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
+    m.playerOSD.observeField("trackSelected", "onTrackSelected")
+    print "[PlayerView] trackSelected observer added"
 
     stopLoadingSpinner()
 
@@ -77,18 +79,47 @@ sub onAvailableAudioTracksChanged()
     end for
 end sub
 
+sub onAudioIndexChange()
+    if m.top.position = 0 then return
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+    print "[PlayerView] Recargando con audioIndex = "; m.top.audioIndex
+end sub
+
 sub onTrackSelected()
     selection = m.playerOSD.trackSelected
+    print "[PlayerView] onTrackSelected received: "; selection
     if not isValid(selection) then return
 
     if selection.kind = "audio"
-        ' TODO: switching audio requires reloading playback with the new
-        ' selectedAudioStreamIndex (see LoadVideoContentTask), preserving position
-        print "[PlayerView] audio track selected: "; selection.index
+        switchAudioTrack(selection.index)
     else if selection.kind = "subtitle"
-        ' TODO: apply the new subtitle index to the active subtitle renderer
         print "[PlayerView] subtitle track selected: "; selection.index
     end if
+end sub
+
+sub switchAudioTrack(desiredIndex as integer)
+    print "[PlayerView] switchAudioTrack called with desiredIndex: "; desiredIndex
+    print "[PlayerView] current audioIndex: "; m.top.audioIndex
+    if desiredIndex = m.top.audioIndex then return
+
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.selectedAudioStreamIndex = desiredIndex
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+    print "[PlayerView] switching to audio index: "; desiredIndex
 end sub
 
 sub centerSpinnerPercentLabel()
