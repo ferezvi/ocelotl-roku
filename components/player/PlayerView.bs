@@ -37,7 +37,7 @@ sub init()
 
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
     m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NOTSET
-    m.top.selectedAudioIndex = currentItem.selectedAudioStreamIndex
+    m.firstContentLoad = true
 
     m.loadContentTask = CreateObject("roSGNode", "LoadVideoContentTask")
     m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
@@ -118,6 +118,11 @@ sub onVideoContentLoaded()
     end if
 
     m.topOSD.logoImage = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
+
+    if m.firstContentLoad
+        m.top.selectedAudioIndex = item.audioIndex
+        m.firstContentLoad = false
+    end if
 
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)

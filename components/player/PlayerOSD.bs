@@ -218,6 +218,8 @@ sub onLanguagePanelSelection()
     if not isValid(selection) then return
 
     if isStringEqual(selection.kind, "audio")
+        m.global.queueManager.callFunc("setPreferredAudioTrackName", selection.trackName)
+
         playerView = m.top.getParent()
         jellyfinIndex = selection.index
         resolvedIndex = selection.index ' fallback si no hay match
