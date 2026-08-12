@@ -28,8 +28,8 @@
         <OptionControls id="optionControls" translation="[103, 200]" />
         <LanguagePanel id="languagePanel" visible="false" />
         <MediaInfoPanel id="mediaInfoPanel" visible="false" />
-        <Trickplay id="trickplay" translation="[106, 680]" />
-        <ProgressBar id="progressBar" translation="[106, 875]" />
+        <Trickplay id="trickplay" translation="[0, 680]" />
+        <ProgressBar id="progressBar" translation="[200, 875]" trackWidth="1520" />
         <VideoControls id="videoControls" translation="[768, 960]" />
     </children>
 

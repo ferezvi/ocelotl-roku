@@ -12,6 +12,8 @@ sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
     m.trickplay = m.top.findNode("trickplay")
+    m.trickplay.progressBarWidth = m.progressBar.trackWidth
+    print "entrando a Playerosd"
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
@@ -35,6 +37,7 @@ sub init()
     m.optionControls.observeField("keyPressed", "onKeyPressed")
     m.languagePanel.observeField("keyPressed", "onKeyPressed")
     m.mediaInfoPanel.observeField("keyPressed", "onKeyPressed")
+    m.progressBar.observeField("seekActivity", "onSeekActivity")
 
     m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
     m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
@@ -88,6 +91,10 @@ sub onInactivityTimerFire()
 end sub
 
 sub onKeyPressed()
+    resetInactivityTimer()
+end sub
+
+sub onSeekActivity()
     resetInactivityTimer()
 end sub
 

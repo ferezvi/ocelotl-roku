@@ -1,5 +1,7 @@
 import "pkg:/source/utils/misc.bs"
 
+const SCREEN_WIDTH = 1920
+
 sub init()
     m.trickplayImage = m.top.findNode("trickplayImage")
 
@@ -62,13 +64,18 @@ sub displayTrickplayImage(position as float)
         data.Height
     ]
 
+    previewX = m.top.previewX
+
+    print "[Trickplay] progressBarWidth="; m.top.progressBarWidth
+    print "[Trickplay] type="; type(m.top.progressBarWidth)
+
+    sideMargin = (1920 - m.top.progressBarWidth) / 2
+
     m.trickplayImage.translation = [
-        m.top.previewX - (data.Width / 2) - (iconColumn * data.Width),
+        sideMargin + previewX - (iconColumn * data.Width) - (data.Width / 2),
         - (iconRow * data.Height)
     ]
-
     m.trickplayImage.visible = true
-    print "[Trickplay] position="; position; " iconIndex="; iconIndex; " tileIndex="; tileIndex; " row="; iconRow; " column="; iconColumn
 end sub
 
 
