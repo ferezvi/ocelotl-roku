@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="Trickplay" extends="Group">
+    <interface>
+        <field id="position" type="float" alwaysNotify="true" />
+        <field id="trickplayData" type="assocarray" />
+        <field id="videoId" type="string" />
+        <field id="previewX" type="float" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <Poster id="trickplayImage" visible="false" translation="[0, 0]" />
+    </children>
+
+</component>

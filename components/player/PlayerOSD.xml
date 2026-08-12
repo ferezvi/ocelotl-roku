@@ -10,6 +10,8 @@
         <field id="playbackState" type="string" />
         <field id="itemId" type="string" />
         <field id="overview" type="string" />
+        <field id="trickplayData" type="assocarray" />
+        <field id="videoId" type="string" />
 
         <field id="fullAudioData" type="array" />
         <field id="fullSubtitleData" type="array" />
@@ -26,6 +28,7 @@
         <OptionControls id="optionControls" translation="[103, 200]" />
         <LanguagePanel id="languagePanel" visible="false" />
         <MediaInfoPanel id="mediaInfoPanel" visible="false" />
+        <Trickplay id="trickplay" translation="[106, 680]" />
         <ProgressBar id="progressBar" translation="[106, 875]" />
         <VideoControls id="videoControls" translation="[768, 960]" />
     </children>

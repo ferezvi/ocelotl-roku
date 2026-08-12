@@ -11,6 +11,7 @@ const OSD_INACTIVITY_TIMEOUT_SECONDS = 10
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
+    m.trickplay = m.top.findNode("trickplay")
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
@@ -21,9 +22,13 @@ sub init()
 
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
+    m.progressBar.observeField("previewPosition", "onPreviewPositionChanged")
+
     m.top.observeField("visible", "onVisibleChanged")
     m.top.observeField("playbackState", "onIsPlayingChanged")
     m.top.observeField("overview", "onOverviewChanged")
+    m.top.observeField("trickplayData", "onTrickplayDataChanged")
+    m.top.observeField("videoId", "onVideoIdChanged")
 
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
@@ -102,6 +107,8 @@ end sub
 sub onProgressBarSeekingChanged()
     m.top.action = m.progressBar.isSeeking ? "seekStart" : "seekEnd"
 
+    m.trickplay.visible = m.progressBar.isSeeking
+
     if m.progressBar.isSeeking
         m.inactivityTimer.control = "stop"
     else
@@ -109,8 +116,31 @@ sub onProgressBarSeekingChanged()
     end if
 end sub
 
+sub onPreviewPositionChanged()
+    previewPosition = m.progressBar.previewPosition
+
+    m.trickplay.position = previewPosition
+
+    if m.progressBar.duration > 0
+        previewRatio = previewPosition / m.progressBar.duration
+
+        if previewRatio < 0 then previewRatio = 0
+        if previewRatio > 1 then previewRatio = 1
+
+        m.trickplay.previewX = m.progressBar.trackWidth * previewRatio
+    end if
+end sub
+
 sub onIsPlayingChanged()
     m.videoControls.playbackState = m.top.playbackState
+end sub
+
+sub onTrickplayDataChanged()
+    m.trickplay.trickplayData = m.top.trickplayData
+end sub
+
+sub onVideoIdChanged()
+    m.trickplay.videoId = m.top.videoId
 end sub
 
 ' ------------------------------------------------------------

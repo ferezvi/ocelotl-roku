@@ -1,0 +1,77 @@
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.trickplayImage = m.top.findNode("trickplayImage")
+
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("trickplayData", "onTrickplayDataChanged")
+end sub
+
+
+sub onPositionChanged()
+    if not isValid(m.top.trickplayData) then return
+    if not isValid(m.top.position) then return
+
+    displayTrickplayImage(m.top.position)
+end sub
+
+
+sub onTrickplayDataChanged()
+    if not isValid(m.top.trickplayData)
+        hide()
+        return
+    end if
+
+    if isValid(m.top.position)
+        displayTrickplayImage(m.top.position)
+    end if
+end sub
+
+
+sub displayTrickplayImage(position as float)
+    data = m.top.trickplayData
+
+    if not isValid(data) then return
+
+    interval = data.Interval / 1000.0
+
+    if interval <= 0 then return
+
+    iconIndex = fix(position / interval)
+
+    tilesPerImage = data.TileHeight * data.TileWidth
+
+    if tilesPerImage <= 0 then return
+
+    tileIndex = fix(iconIndex / tilesPerImage)
+    tileIconIndex = iconIndex - (tileIndex * tilesPerImage)
+
+    iconRow = fix(tileIconIndex / data.TileWidth)
+    iconColumn = tileIconIndex mod data.TileWidth
+
+    tileUri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
+
+    m.trickplayImage.uri = tileUri
+    m.trickplayImage.width = data.Width * data.TileWidth
+    m.trickplayImage.height = data.Height * data.TileHeight
+
+    m.trickplayImage.clippingRect = [
+        iconColumn * data.Width,
+        iconRow * data.Height,
+        data.Width,
+        data.Height
+    ]
+
+    m.trickplayImage.translation = [
+        m.top.previewX - (data.Width / 2) - (iconColumn * data.Width),
+        - (iconRow * data.Height)
+    ]
+
+    m.trickplayImage.visible = true
+    print "[Trickplay] position="; position; " iconIndex="; iconIndex; " tileIndex="; tileIndex; " row="; iconRow; " column="; iconColumn
+end sub
+
+
+sub hide()
+    m.trickplayImage.visible = false
+end sub

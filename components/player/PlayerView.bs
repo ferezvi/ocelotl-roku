@@ -47,6 +47,10 @@ sub init()
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 
+    m.preloadTrickplayImagesTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
+    m.preloadTrickplayImagesTask.videoID = currentItem.id
+    m.top.appendChild(m.preloadTrickplayImagesTask)
+
     centerSpinnerPercentLabel()
     m.top.setFocus(true)
 end sub
@@ -68,6 +72,28 @@ sub onVideoContentLoaded()
 
     item = videoContent[0]
 
+    m.trickplay = item.trickplay
+
+    m.trickplayDataFinal = invalid
+
+    if isValidAndNotEmpty(m.trickplay)
+        trickplayData = m.trickplay.LookupCI(m.top.id)
+
+        if isValidAndNotEmpty(trickplayData)
+            m.trickplayDataFinal = trickplayData.lookupCI(trickplayData.keys()[0])
+        end if
+    end if
+
+    m.playerOSD.trickplayData = m.trickplayDataFinal
+
+    if isValidAndNotEmpty(m.trickplayDataFinal)
+        m.preloadTrickplayImagesTask.numImagesToLoad = fix((m.trickplayDataFinal.ThumbnailCount - 1) / (m.trickplayDataFinal.TileHeight * m.trickplayDataFinal.TileWidth))
+        m.preloadTrickplayImagesTask.trickplayWidth = m.trickplayDataFinal.Width
+        m.preloadTrickplayImagesTask.method = "ADD"
+        m.preloadTrickplayImagesTask.control = TaskControl.RUN
+    end if
+
+
     m.top.PlaySessionId = item.PlaySessionId
     m.top.videoId = item.id
     m.top.container = item.container
@@ -78,6 +104,7 @@ sub onVideoContentLoaded()
     m.top.transcodeParams = item.transcodeparams
     m.top.isTranscoded = item.isTranscoded
 
+    m.playerOSD.videoId = item.id
     m.top.content = item.content
 
     ' Falls back to track 0 if audioIndex is somehow invalid on this load - Roku's
