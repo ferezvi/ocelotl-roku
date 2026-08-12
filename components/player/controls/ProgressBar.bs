@@ -92,6 +92,8 @@ end sub
 sub stopSeekHold()
     m.seekRepeatTimer.control = "stop"
     m.seekRepeatTimer.duration = 0.5
+    m.seekHoldCount = 0
+    m.seekDirection = 0
 end sub
 
 ' Applies the previewed position as the real seek and clears seeking state
