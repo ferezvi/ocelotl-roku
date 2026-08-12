@@ -4,11 +4,16 @@ import "pkg:/source/utils/misc.bs"
 
 const OSD_INACTIVITY_TIMEOUT_SECONDS = 5
 
+' ------------------------------------------------------------
+' Lifecycle
+' ------------------------------------------------------------
+
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
+    m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
 
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
@@ -22,12 +27,10 @@ sub init()
     m.progressBar.observeField("keyPressed", "onKeyPressed")
     m.optionControls.observeField("keyPressed", "onKeyPressed")
     m.languagePanel.observeField("keyPressed", "onKeyPressed")
+    m.mediaInfoPanel.observeField("keyPressed", "onKeyPressed")
 
     m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
     m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
-
-    m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
-    m.mediaInfoPanel.observeField("keyPressed", "onKeyPressed")
     m.mediaInfoPanel.observeField("visible", "onMediaInfoPanelVisibleChanged")
 
     m.mediaInfoTask = createObject("roSGNode", "GetPlaybackInfoTask")
@@ -39,6 +42,10 @@ sub init()
     m.inactivityTimer.observeField("fire", "onInactivityTimerFire")
     m.top.appendChild(m.inactivityTimer)
 end sub
+
+' ------------------------------------------------------------
+' Inactivity timer / OSD visibility
+' ------------------------------------------------------------
 
 ' Restarts the OSD when it becomes visible (regardless of what triggered
 ' the show) and stops it once the OSD is hidden, so it doesn't fire a
@@ -74,6 +81,19 @@ sub onKeyPressed()
     resetInactivityTimer()
 end sub
 
+' ------------------------------------------------------------
+' Controls / progress bar
+' ------------------------------------------------------------
+
+sub onVideoControlsAction(event as object)
+    m.top.action = event.getData()
+end sub
+
+sub onProgressBarSeek()
+    m.top.seekPosition = m.progressBar.seek
+    m.top.action = "seek"
+end sub
+
 sub onProgressBarSeekingChanged()
     m.top.action = m.progressBar.isSeeking ? "seekStart" : "seekEnd"
 
@@ -84,80 +104,120 @@ sub onProgressBarSeekingChanged()
     end if
 end sub
 
-sub onVideoControlsAction(event as object)
-    m.top.action = event.getData()
+sub onIsPlayingChanged()
+    m.videoControls.playbackState = m.top.playbackState
 end sub
+
+' ------------------------------------------------------------
+' Option controls dispatch
+' ------------------------------------------------------------
 
 sub onOptionControlsAction(event as object)
     action = event.getData()
     if action = "languageButton"
-        ' En lugar de abrir LanguagePanel, usa el diálogo legacy
-        openLegacyAudioDialog()
+        openLanguagePanel()
     end if
 end sub
 
-sub openLegacyAudioDialog()
-    ' Construir audioData igual que ViewCreator
-    audioData = { data: [] }
-    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+' ------------------------------------------------------------
+' Language panel (audio / subtitle selection)
+' ------------------------------------------------------------
 
-    for each stream in m.top.fullAudioData
-        item = {
-            "Index": stream.Index,
-            "RokuTrackName": stream.RokuTrackName,
-            "IsExternal": stream.IsExternal,
-            "Track": { "description": stream.DisplayTitle },
-            "Type": "audioselection"
-        }
-        if isStringEqual(stream.RokuTrackName, preferredAudioTrackName)
-            item.selected = true
-        end if
-        audioData.data.push(item)
-    end for
-
-    ' Llamar al diálogo legacy
-    m.global.sceneManager.callFunc("radioDialog", tr("Select Audio"), audioData)
-    m.global.sceneManager.observeField("returnData", "onLegacyAudioSelected")
+sub openLanguagePanel()
+    m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, m.top.audioIndex)
+    m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, m.top.selectedSubtitleIndex)
+    m.languagePanel.visible = true
+    resetInactivityTimer()
 end sub
 
-' onLegacyAudioSelected: Procesa la selección del diálogo legacy y la reenvía
-' por el mismo camino que ya usa el LanguagePanel (m.top.trackSelected ->
-' PlayerView.onTrackSelected -> switchAudioTrack).
-'
-' IMPORTANTE: m.top.audioIndex en PlayerView.bs vive en la escala nativa
-' de Roku (el "Track" de availableAudioTracks), NO en la escala de Jellyfin
-' (el "Index" de fullAudioData/selection). switchAudioTrack compara
-' desiredIndex contra m.top.audioIndex directamente, asi que hay que
-' convertir selection.RokuTrackName -> Track de Roku antes de emitirlo,
-' o si no la comparacion "desiredIndex = m.top.audioIndex" puede coincidir
-' por casualidad numerica entre dos escalas distintas y no hacer nada.
-sub onLegacyAudioSelected()
-    m.global.sceneManager.unobserveField("returnData")
-    selection = m.global.sceneManager.returnData
-    if not isValid(selection) or selection.Type <> "audioselection" then return
+' Adapter: raw Jellyfin audio streams -> LanguagePanel item shape.
+' trackName carries the RokuTrackName so the caller can resolve it against
+' the Video node's native Track index before switching (see
+' onLanguagePanelSelection).
+function buildAudioContent(streams as object, selectedIndex as integer) as object
+    result = []
+    if not isValidAndNotEmpty(streams) then return result
 
-    m.global.queueManager.callFunc("setPreferredAudioTrackName", selection.RokuTrackName)
+    for each stream in streams
+        label = isValidAndNotEmpty(stream.Title) ? stream.Title : stream.DisplayTitle
+        if not isValidAndNotEmpty(label) then label = stream.Language
 
-    playerView = m.top.getParent()
-    resolvedIndex = selection.Index ' fallback si no hay match (misma logica legacy)
+        result.push({
+            kind: "audio",
+            index: stream.Index,
+            selected: (stream.Index = selectedIndex),
+            track: { description: label },
+            trackName: stream.RokuTrackName
+        })
+    end for
 
-    if isValid(playerView) and isValid(playerView.availableAudioTracks)
-        for each audioTrack in playerView.availableAudioTracks
-            if isStringEqual(audioTrack.LookupCI("name"), selection.RokuTrackName)
-                resolvedIndex = audioTrack.LookupCI("Track").toint()
-                exit for
-            end if
+    return result
+end function
+
+' Adapter: raw Jellyfin subtitle streams -> same shape, plus a synthetic
+' "Off" entry at the top since the server never sends one
+function buildSubtitleContent(subtitles as object, selectedIndex as integer) as object
+    result = [{
+        kind: "subtitle",
+        index: SubtitleSelection.NONE,
+        selected: (selectedIndex = SubtitleSelection.NONE),
+        track: { description: tr("Off") }
+    }]
+
+    if isValidAndNotEmpty(subtitles)
+        for each subtitle in subtitles
+            result.push({
+                kind: "subtitle",
+                index: subtitle.Index,
+                selected: (subtitle.Index = selectedIndex),
+                track: { description: subtitle.Track.Description }
+            })
         end for
     end if
 
-    m.top.trackSelected = {
-        kind: "audio",
-        index: resolvedIndex
-    }
+    return result
+end function
+
+' onLanguagePanelSelection: forwards the LanguagePanel selection to PlayerView.
+'
+' selection.index comes in Jellyfin's scale (buildAudioContent uses
+' stream.Index). PlayerView.audioIndex lives in Roku's native scale (the
+' "Track" from availableAudioTracks). switchAudioTrack compares desiredIndex
+' against m.top.audioIndex directly, so it must be converted before emitting -
+' otherwise the comparison can accidentally match between the two different
+' scales and silently fail to switch audio.
+sub onLanguagePanelSelection()
+    selection = m.languagePanel.selectionMade
+    if not isValid(selection) then return
+
+    if isStringEqual(selection.kind, "audio")
+        playerView = m.top.getParent()
+        resolvedIndex = selection.index ' fallback if no match is found
+
+        if isValid(playerView) and isValid(playerView.availableAudioTracks)
+            for each audioTrack in playerView.availableAudioTracks
+                if isStringEqual(audioTrack.LookupCI("name"), selection.trackName)
+                    resolvedIndex = audioTrack.LookupCI("Track").toint()
+                    exit for
+                end if
+            end for
+        end if
+
+        selection.index = resolvedIndex
+    end if
+
+    m.top.trackSelected = selection
 end sub
 
+sub onLanguagePanelVisibleChanged()
+    if not m.languagePanel.visible
+        m.optionControls.callFunc("focusControls")
+    end if
+end sub
 
-
+' ------------------------------------------------------------
+' Media info panel
+' ------------------------------------------------------------
 
 sub openMediaInfoPanel()
     m.mediaInfoPanel.lines = [{ text: tr("Loading..."), isHeader: false }]
@@ -203,90 +263,9 @@ sub onMediaInfoPanelVisibleChanged()
     end if
 end sub
 
-sub openLanguagePanel()
-    print "[PlayerOSD] openLanguagePanel called"
-    print "[PlayerOSD] fullAudioData count: "; m.top.fullAudioData.count()
-    m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, m.top.audioIndex)
-    m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, m.top.selectedSubtitleIndex)
-    m.languagePanel.visible = true
-    resetInactivityTimer()
-end sub
-
-' ============================================================
-' MODIFICADO: AÑADIR trackName
-' ============================================================
-function buildAudioContent(streams as object, selectedIndex as integer) as object
-    print "[PlayerOSD] buildAudioContent called, streams count: "; streams.count()
-    result = []
-    if not isValidAndNotEmpty(streams) then return result
-
-    for each stream in streams
-        label = isValidAndNotEmpty(stream.Title) ? stream.Title : stream.DisplayTitle
-        if not isValidAndNotEmpty(label) then label = stream.Language
-
-        result.push({
-            kind: "audio",
-            index: stream.Index,
-            selected: (stream.Index = selectedIndex),
-            track: { description: label },
-            trackName: stream.RokuTrackName ' <--- NUEVO
-        })
-    end for
-
-    return result
-end function
-
-' Adapter: raw Jellyfin subtitle streams -> same shape, plus a synthetic
-' "Off" entry at the top since the server never sends one
-function buildSubtitleContent(subtitles as object, selectedIndex as integer) as object
-    result = [{
-        kind: "subtitle",
-        index: SubtitleSelection.NONE,
-        selected: (selectedIndex = SubtitleSelection.NONE),
-        track: { description: tr("Off") }
-    }]
-
-    if isValidAndNotEmpty(subtitles)
-        for each subtitle in subtitles
-            result.push({
-                kind: "subtitle",
-                index: subtitle.Index,
-                selected: (subtitle.Index = selectedIndex),
-                track: { description: subtitle.Track.Description }
-            })
-        end for
-    end if
-
-    return result
-end function
-
-' ============================================================
-' MODIFICADO: PROCESAR SELECCIÓN Y ACTUALIZAR REPRODUCTOR
-' ============================================================
-sub onLanguagePanelSelection()
-    selection = m.languagePanel.selectionMade
-    print "[PlayerOSD] onLanguagePanelSelection received: "; selection
-    if not isValid(selection) then return
-
-    ' Emitir la selección hacia PlayerView
-    m.top.trackSelected = selection
-    print "[PlayerOSD] trackSelected emitted to PlayerView" ' El panel permanece abierto
-end sub
-
-sub onLanguagePanelVisibleChanged()
-    if not m.languagePanel.visible
-        m.optionControls.callFunc("focusControls")
-    end if
-end sub
-
-sub onProgressBarSeek()
-    m.top.seekPosition = m.progressBar.seek
-    m.top.action = "seek"
-end sub
-
-sub onIsPlayingChanged()
-    m.videoControls.playbackState = m.top.playbackState
-end sub
+' ------------------------------------------------------------
+' Focus helpers
+' ------------------------------------------------------------
 
 sub focusControls()
     m.optionControls.callFunc("clearFocus")
@@ -303,6 +282,10 @@ sub focusOptionControls()
     m.videoControls.callFunc("clearFocus")
     m.optionControls.callFunc("focusControls")
 end sub
+
+' ------------------------------------------------------------
+' Key handling
+' ------------------------------------------------------------
 
 ' UP/DOWN switches focus between progress bar and controls, BACK closes the OSD
 ' (unless the progress bar is mid-seek, in which case it cancels the seek first)

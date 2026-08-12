@@ -7,22 +7,32 @@ import "pkg:/source/utils/misc.bs"
 const SEEK_SECONDS = 10
 const SKIP_SECONDS = 30
 
+' ------------------------------------------------------------
+' Lifecycle
+' ------------------------------------------------------------
+
 sub init()
     m.top.enableUI = false
     m.playerOSD = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
+    m.progressBar = m.playerOSD.findNode("progressBar")
+    m.topOSD = m.playerOSD.findNode("topOSD")
+
     m.playerOSD.observeField("trackSelected", "onTrackSelected")
-    print "[PlayerView] trackSelected observer added"
+    m.playerOSD.observeField("action", "onOSDAction")
+    m.playerOSD.observeField("visible", "onOSDVisibilityChanged")
+
+    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
+    m.top.observeField("state", "onStateChanged")
+    m.top.observeField("position", "onVideoPositionChanged")
+    m.top.observeField("duration", "onVideoPositionChanged")
+    m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
 
     stopLoadingSpinner()
 
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
-
-    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
-
-    m.playerOSD.observeField("action", "onOSDAction")
 
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
     m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : -2
@@ -35,121 +45,11 @@ sub init()
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 
-    m.top.observeField("state", "onStateChanged")
-    m.playerOSD.observeField("visible", "onOSDVisibilityChanged")
-
-    m.progressBar = m.playerOSD.findNode("progressBar")
-    m.topOSD = m.playerOSD.findNode("topOSD")
-    m.playerOSD.observeField("trackSelected", "onTrackSelected")
-    m.top.observeField("position", "onVideoPositionChanged")
-    m.top.observeField("duration", "onVideoPositionChanged")
-    m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
-
     centerSpinnerPercentLabel()
     m.top.setFocus(true)
 end sub
 
-sub onAvailableAudioTracksChanged()
-    if not isValidAndNotEmpty(m.top.availableAudioTracks) then return
-
-    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
-
-    for each audioTrack in m.top.availableAudioTracks
-        trackName = audioTrack.LookupCI("name")
-
-        if isStringEqual(trackName, preferredAudioTrackName)
-            m.global.queueManager.callFunc("setPreferredAudioTrackIndex", audioTrack.LookupCI("Track").toint())
-            m.top.audioIndex = audioTrack.LookupCI("Track")
-
-            if m.top.currentAudioTrack = audioTrack.LookupCI("Track")
-                return
-            end if
-
-            if m.top.position <> 0
-                m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
-            end if
-
-            m.top.control = VideoControl.STOP
-            m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
-            m.loadContentTask.itemId = m.top.id
-            m.loadContentTask.observeField("content", "onVideoContentLoaded")
-            m.loadContentTask.control = TaskControl.RUN
-            exit for
-        end if
-    end for
-end sub
-
-sub onAudioIndexChange()
-    if m.top.position = 0 then return
-    if m.top.position <> 0
-        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
-    end if
-
-    m.top.control = VideoControl.STOP
-    m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
-    m.loadContentTask.itemId = m.top.id
-    m.loadContentTask.observeField("content", "onVideoContentLoaded")
-    m.loadContentTask.control = TaskControl.RUN
-    print "[PlayerView] Recargando con audioIndex = "; m.top.audioIndex
-end sub
-
-sub onTrackSelected()
-    selection = m.playerOSD.trackSelected
-    print "[PlayerView] onTrackSelected received: "; selection
-    if not isValid(selection) then return
-
-    if selection.kind = "audio"
-        switchAudioTrack(selection.index)
-    else if selection.kind = "subtitle"
-        print "[PlayerView] subtitle track selected: "; selection.index
-    end if
-end sub
-
-sub switchAudioTrack(desiredIndex as integer)
-    print "[PlayerView] switchAudioTrack called with desiredIndex: "; desiredIndex
-    print "[PlayerView] current audioIndex: "; m.top.audioIndex
-    if desiredIndex = m.top.audioIndex then return
-
-    if m.top.position <> 0
-        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
-    end if
-
-    m.top.control = VideoControl.STOP
-    m.loadContentTask.selectedAudioStreamIndex = desiredIndex
-    m.loadContentTask.itemId = m.top.id
-    m.loadContentTask.observeField("content", "onVideoContentLoaded")
-    m.loadContentTask.control = TaskControl.RUN
-    print "[PlayerView] switching to audio index: "; desiredIndex
-end sub
-
-sub centerSpinnerPercentLabel()
-    spinnerWidth = m.playerSpinner.poster.bitmapWidth
-    spinnerHeight = m.playerSpinner.poster.bitmapHeight
-
-    m.spinnerPercentLabel.translation = [
-        m.playerSpinner.translation[0] + spinnerWidth / 2 - m.spinnerPercentLabel.width / 2,
-        m.playerSpinner.translation[1] + spinnerHeight / 2 - m.spinnerPercentLabel.height / 2
-    ]
-end sub
-
-sub onBufferingStatusChanged()
-    if m.top.state <> MediaPlaybackState.BUFFERING
-        return
-    end if
-
-    if isValid(m.top.bufferingStatus)
-        percentage = m.top.bufferingStatus["percentage"]
-
-        if isValid(percentage)
-            m.spinnerPercentLabel.text = percentage.ToStr() + "%"
-            centerSpinnerPercentLabel()
-            m.spinnerPercentLabel.visible = true
-        end if
-    end if
-end sub
-
 sub onVideoContentLoaded()
-
     stopLoadingSpinner()
 
     m.loadContentTask.unobserveField("content")
@@ -213,13 +113,12 @@ sub onVideoContentLoaded()
     end if
 
     m.topOSD.logoImage = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
-    stopLoadingSpinner()
+
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)
 end sub
 
 sub onStateChanged()
-    print "[PlayerView] state: "; m.top.state
     m.playerOSD.playbackState = m.top.state
 
     if m.top.state = MediaPlaybackState.BUFFERING
@@ -231,13 +130,105 @@ sub onStateChanged()
     end if
 end sub
 
+sub onBufferingStatusChanged()
+    if m.top.state <> MediaPlaybackState.BUFFERING then return
+
+    if isValid(m.top.bufferingStatus)
+        percentage = m.top.bufferingStatus["percentage"]
+
+        if isValid(percentage)
+            m.spinnerPercentLabel.text = percentage.ToStr() + "%"
+            centerSpinnerPercentLabel()
+            m.spinnerPercentLabel.visible = true
+        end if
+    end if
+end sub
+
+sub onVideoPositionChanged()
+    progressBar = m.playerOSD.findNode("progressBar")
+    if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
+        progressBar.position = m.top.position
+        progressBar.duration = m.top.duration
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Audio track selection
+' ------------------------------------------------------------
+
+' onAvailableAudioTracksChanged: Applies the user's preferred audio track
+' (by name) as soon as the Video node reports which tracks are available -
+' used for the initial "auto-select preferred language" behavior, not for
+' manual selection from the OSD (that goes through onTrackSelected).
+sub onAvailableAudioTracksChanged()
+    if not isValidAndNotEmpty(m.top.availableAudioTracks) then return
+
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+
+    for each audioTrack in m.top.availableAudioTracks
+        trackName = audioTrack.LookupCI("name")
+
+        if isStringEqual(trackName, preferredAudioTrackName)
+            rokuTrackString = audioTrack.LookupCI("Track")
+            rokuTrackIndex = rokuTrackString.toint()
+
+            m.global.queueManager.callFunc("setPreferredAudioTrackIndex", rokuTrackIndex)
+            m.top.audioIndex = rokuTrackIndex
+
+            ' currentAudioTrack is a string field on the Video node - compare
+            ' against the raw string, not the converted integer
+            if m.top.currentAudioTrack = rokuTrackString then return
+
+            if m.top.position <> 0
+                m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+            end if
+
+            m.top.control = VideoControl.STOP
+            m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
+            m.loadContentTask.itemId = m.top.id
+            m.loadContentTask.observeField("content", "onVideoContentLoaded")
+            m.loadContentTask.control = TaskControl.RUN
+            exit for
+        end if
+    end for
+end sub
+
+' onTrackSelected: Manual selection from the OSD (LanguagePanel or legacy dialog).
+' desiredIndex must already be in Roku's native Track scale, not Jellyfin's
+' stream Index - the caller (PlayerOSD) is responsible for that conversion.
+sub onTrackSelected()
+    selection = m.playerOSD.trackSelected
+    if not isValid(selection) then return
+
+    if selection.kind = "audio"
+        switchAudioTrack(selection.index)
+    else if selection.kind = "subtitle"
+        ' TODO: subtitle switching
+    end if
+end sub
+
+sub switchAudioTrack(desiredIndex as integer)
+    if desiredIndex = m.top.audioIndex then return
+
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.selectedAudioStreamIndex = desiredIndex
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub
+
+' ------------------------------------------------------------
+' OSD / input handling
+' ------------------------------------------------------------
+
 function onKeyEvent(key as string, press as boolean) as boolean
-    print "[PlayerOSD] onKeyEvent key="; key; " press="; press
     if not press then return false
 
-    if m.playerOSD.visible
-        return false
-    end if
+    if m.playerOSD.visible then return false
 
     if isStringEqual(key, KeyCode.OK)
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
@@ -299,19 +290,6 @@ sub onOSDAction(event as object)
     end if
 end sub
 
-function max(a as float, b as float) as float
-    if a > b then return a
-    return b
-end function
-
-sub onVideoPositionChanged()
-    progressBar = m.playerOSD.findNode("progressBar")
-    if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
-        progressBar.position = m.top.position
-        progressBar.duration = m.top.duration
-    end if
-end sub
-
 sub onOSDVisibilityChanged()
     if not m.playerOSD.visible
         m.top.setFocus(true)
@@ -323,3 +301,22 @@ sub hideOSD()
     m.top.setFocus(true)
     m.playerOSD.visible = false
 end sub
+
+' ------------------------------------------------------------
+' Helpers
+' ------------------------------------------------------------
+
+sub centerSpinnerPercentLabel()
+    spinnerWidth = m.playerSpinner.poster.bitmapWidth
+    spinnerHeight = m.playerSpinner.poster.bitmapHeight
+
+    m.spinnerPercentLabel.translation = [
+        m.playerSpinner.translation[0] + spinnerWidth / 2 - m.spinnerPercentLabel.width / 2,
+        m.playerSpinner.translation[1] + spinnerHeight / 2 - m.spinnerPercentLabel.height / 2
+    ]
+end sub
+
+function max(a as float, b as float) as float
+    if a > b then return a
+    return b
+end function
