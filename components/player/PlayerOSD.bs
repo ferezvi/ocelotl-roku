@@ -2,7 +2,7 @@ import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/utils/misc.bs"
 
-const OSD_INACTIVITY_TIMEOUT_SECONDS = 5
+const OSD_INACTIVITY_TIMEOUT_SECONDS = 10
 
 ' ------------------------------------------------------------
 ' Lifecycle
@@ -114,8 +114,11 @@ end sub
 
 sub onOptionControlsAction(event as object)
     action = event.getData()
+
     if action = "languageButton"
         openLanguagePanel()
+    else if action = "mediaInfoButton"
+        openMediaInfoPanel()
     end if
 end sub
 
