@@ -1,0 +1,9 @@
+sub init()
+    m.overviewText = m.top.findNode("overviewText")
+
+    m.top.observeField("overview", "onOverviewChanged")
+end sub
+
+sub onOverviewChanged()
+    m.overviewText.text = m.top.overview
+end sub

@@ -96,6 +96,7 @@ sub onVideoContentLoaded()
     m.playerOSD.audioIndex = item.audioIndex
     m.playerOSD.selectedSubtitleIndex = item.SelectedSubtitle
     m.playerOSD.itemId = item.id
+    m.playerOSD.overview = item.overview
 
     ' TODO: Live TV will use its own OSD model instead of PlayerOSDTop
     if item.content.live

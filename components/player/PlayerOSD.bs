@@ -14,6 +14,7 @@ sub init()
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
+    m.synopsisPanel = m.top.findNode("synopsisPanel")
 
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
@@ -22,6 +23,7 @@ sub init()
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
     m.top.observeField("visible", "onVisibleChanged")
     m.top.observeField("playbackState", "onIsPlayingChanged")
+    m.top.observeField("overview", "onOverviewChanged")
 
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
@@ -72,6 +74,10 @@ sub onInactivityTimerFire()
         m.mediaInfoPanel.visible = false
     end if
 
+    if m.synopsisPanel.visible
+        m.synopsisPanel.visible = false
+    end if
+
     if m.top.visible
         m.top.action = "hide"
     end if
@@ -119,7 +125,22 @@ sub onOptionControlsAction(event as object)
         openLanguagePanel()
     else if action = "mediaInfoButton"
         openMediaInfoPanel()
+    else if action = "infoButton"
+        toggleSynopsisPanel()
     end if
+end sub
+
+' ------------------------------------------------------------
+' Synopsis
+' ------------------------------------------------------------
+sub onOverviewChanged()
+    m.synopsisPanel.overview = m.top.overview
+end sub
+
+sub toggleSynopsisPanel()
+    m.synopsisPanel.visible = not m.synopsisPanel.visible
+
+    resetInactivityTimer()
 end sub
 
 ' ------------------------------------------------------------
@@ -336,6 +357,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true ' edge of the row - no horizontal handoff between rows anymore
 
     else if isStringEqual(key, KeyCode.BACK)
+        m.synopsisPanel.visible = false
         m.top.action = "hide"
         return true
     end if

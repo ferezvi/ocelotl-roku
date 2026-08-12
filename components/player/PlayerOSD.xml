@@ -9,6 +9,7 @@
         <field id="seekPosition" type="float" />
         <field id="playbackState" type="string" />
         <field id="itemId" type="string" />
+        <field id="overview" type="string" />
 
         <field id="fullAudioData" type="array" />
         <field id="fullSubtitleData" type="array" />
@@ -21,6 +22,7 @@
         <Poster id="topGradient" uri="pkg:/images/ui/gradientes/top_gradient.png" translation="[0, 0]" width="1920" height="360" />
         <Poster id="bottomGradient" uri="pkg:/images/ui/gradientes/bottom_gradient.png" translation="[0, 720]" width="1920" height="360" />
         <PlayerOSDTop id="topOSD" />
+        <SynopsisPanel id="synopsisPanel" visible="false" translation="[60, 250]" />
         <OptionControls id="optionControls" translation="[103, 200]" />
         <LanguagePanel id="languagePanel" visible="false" />
         <MediaInfoPanel id="mediaInfoPanel" visible="false" />

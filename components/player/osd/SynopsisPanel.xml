@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="SynopsisPanel" extends="Group">
+    <interface>
+        <field id="overview" type="string" />
+    </interface>
+
+    <children>
+        <Rectangle id="background" width="1800" height="250" color="#0E0323" opacity="0.94" />
+        <Label id="title" translation="[32, 28]" text="SYNOPSIS" color="#A855F7" font="font:MediumSystemFont" />
+        <Text id="overviewText" translation="[32, 72]" width="1736" height="150" text="Synopsis" color="0xffffffFF" />
+    </children>
+</component>

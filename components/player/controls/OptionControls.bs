@@ -6,6 +6,7 @@ const TOPLEFT_CONTROLS_TOP_PADDING = 24
 sub init()
     m.buttons = [
         m.top.findNode("mediaInfoButton"),
+        m.top.findNode("infoButton"),
         m.top.findNode("languageButton")
     ]
 

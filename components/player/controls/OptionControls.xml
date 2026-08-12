@@ -11,7 +11,8 @@
 
     <children>
         <LayoutGroup id="row" layoutDirection="horizontal" itemSpacings="[16]" vertAlignment="center">
-            <MDIconButton id="mediaInfoButton" size="Large" icon="pkg:/images/ui/player/info.png" />
+            <MDIconButton id="mediaInfoButton" size="Large" icon="pkg:/images/ui/player/monitor-cog.png" />
+            <MDIconButton id="infoButton" size="Large" icon="pkg:/images/ui/player/info.png" />
             <MDIconButton id="languageButton" size="Large" icon="pkg:/images/ui/player/languages.png" />
         </LayoutGroup>
     </children>
