@@ -52,6 +52,10 @@ sub init()
     m.preloadTrickplayImagesTask.videoID = currentItem.id
     m.top.appendChild(m.preloadTrickplayImagesTask)
 
+    m.playbackTimer = m.top.findNode("playbackTimer")
+    m.playbackTimer.observeField("fire", "ReportPlayback")
+    m.playReported = false
+
     centerSpinnerPercentLabel()
     m.top.setFocus(true)
 end sub
@@ -169,6 +173,49 @@ sub onStateChanged()
         m.playerSpinner.visible = false
         m.spinnerPercentLabel.visible = false
     end if
+
+    if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+        if not m.playReported
+            ReportPlayback("start")
+            m.playReported = true
+        else
+            ReportPlayback()
+        end if
+        m.playbackTimer.control = "start"
+    else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED)
+        m.playbackTimer.control = "stop"
+        ReportPlayback()
+    else if isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
+        m.playbackTimer.control = "stop"
+        if m.playReported
+            ReportPlayback("stop")
+            m.playReported = false
+        end if
+    else if isStringEqual(m.top.state, MediaPlaybackState.FINISHED)
+        m.playbackTimer.control = "stop"
+        ReportPlayback("stop")
+        m.playReported = false
+    end if
+end sub
+
+' ReportPlayback: Reports playback progress/start/stop to the server via
+' the shared playstateTask. state is "start"/"stop", or the default
+' "update" for periodic progress reports.
+sub ReportPlayback(state = "update" as string)
+    if m.top.position = invalid then return
+
+    params = {
+        "ItemId": m.top.id,
+        "PlaySessionId": m.top.PlaySessionId,
+        "PositionTicks": int(m.top.position) * 10000000&,
+        "IsPaused": isStringEqual(m.top.state, MediaPlaybackState.PAUSED)
+    }
+
+    playstateTask = m.global.playstateTask
+    if not isValid(playstateTask) then return
+
+    playstateTask.setFields({ status: state, params: params })
+    playstateTask.control = TaskControl.RUN
 end sub
 
 sub onBufferingStatusChanged()
