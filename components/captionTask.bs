@@ -384,6 +384,11 @@ sub updateCaption()
         return
     end if
 
+    ' Keep the last rendered captions on screen while paused instead of
+    ' clearing them - the position clock isn't advancing during pause so
+    ' there's nothing to resync, we just skip the update.
+    if isStringEqual(m.top.playerState, "pausedon") then return
+
     m.top.currentCaption = []
 
     if not isStringEqual(m.top.playerState, "playingon") then return
