@@ -10,7 +10,8 @@
     </interface>
 
     <children>
-        <Poster id="trickplayImage" visible="false" translation="[0, 0]" />
+        <Rectangle id="trickplayBackground" color="0x000000FF" visible="false" />
+        <Poster id="trickplayImage" visible="false" translation="[0, 0]" loadDisplayMode="limitSize" />
     </children>
 
 </component>

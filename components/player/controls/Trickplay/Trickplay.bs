@@ -2,8 +2,22 @@ import "pkg:/source/utils/misc.bs"
 
 const SCREEN_WIDTH = 1920
 
+' Fixed preview box (object-fit: contain).
+' Every aspect ratio renders consistently: 4:3 content gets pillarbox,
+' ultra-wide content gets letterbox.
+const TRICKPLAY_BOX_WIDTH = 320
+const TRICKPLAY_BOX_HEIGHT = 180
+
+' Maximum decoded mosaic dimensions regardless of server grid size (5x5, 10x10, etc.).
+' Protects low-end devices without requiring Jellyfin server-side changes.
+const TRICKPLAY_MAX_MOSAIC_WIDTH = 1600
+const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1200
+
 sub init()
     m.trickplayImage = m.top.findNode("trickplayImage")
+    m.trickplayBackground = m.top.findNode("trickplayBackground")
+    m.trickplayBackground.width = TRICKPLAY_BOX_WIDTH
+    m.trickplayBackground.height = TRICKPLAY_BOX_HEIGHT
 
     m.top.observeField("position", "onPositionChanged")
     m.top.observeField("trickplayData", "onTrickplayDataChanged")
@@ -51,31 +65,68 @@ sub displayTrickplayImage(position as float)
     iconRow = fix(tileIconIndex / data.TileWidth)
     iconColumn = tileIconIndex mod data.TileWidth
 
+    ' Display scale controls only the final on-screen size.
+    ' It is independent from memory protection and always fits the preview box.
+    displayScale = TRICKPLAY_BOX_HEIGHT / data.Height
+    displayScaleAlt = TRICKPLAY_BOX_WIDTH / data.Width
+    if displayScaleAlt < displayScale then displayScale = displayScaleAlt
+
+    tileWidth = data.Width * displayScale
+    tileHeight = data.Height * displayScale
+    mosaicWidth = data.Width * data.TileWidth * displayScale
+    mosaicHeight = data.Height * data.TileHeight * displayScale
+
+    ' Load scale only controls decode memory usage.
+    ' It may be lower than displayScale for large mosaics (for example 10x10 grids).
+    ' Roku upscales the decoded texture to the display size, which may slightly
+    ' reduce sharpness but does not affect layout or positioning.
+    loadMosaicWidth = mosaicWidth
+    loadMosaicHeight = mosaicHeight
+    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
+    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
+    if loadCapScaleAlt < loadCapScale then loadCapScale = loadCapScaleAlt
+    if loadCapScale < 1.0
+        loadMosaicWidth = mosaicWidth * loadCapScale
+        loadMosaicHeight = mosaicHeight * loadCapScale
+    end if
+
     tileUri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
 
+    ' Roku downscales during decoding, preventing the full JPEG size from
+    ' being allocated as a texture in memory.
+    m.trickplayImage.loadWidth = loadMosaicWidth
+    m.trickplayImage.loadHeight = loadMosaicHeight
     m.trickplayImage.uri = tileUri
-    m.trickplayImage.width = data.Width * data.TileWidth
-    m.trickplayImage.height = data.Height * data.TileHeight
+    m.trickplayImage.width = mosaicWidth
+    m.trickplayImage.height = mosaicHeight
 
     m.trickplayImage.clippingRect = [
-        iconColumn * data.Width,
-        iconRow * data.Height,
-        data.Width,
-        data.Height
+        iconColumn * tileWidth,
+        iconRow * tileHeight,
+        tileWidth,
+        tileHeight
     ]
 
     previewX = m.top.previewX
+    sideMargin = (SCREEN_WIDTH - m.top.progressBarWidth) / 2
+    boxLeft = sideMargin + previewX - (TRICKPLAY_BOX_WIDTH / 2)
 
-    sideMargin = (1920 - m.top.progressBarWidth) / 2
+    ' Center the selected tile inside the fixed preview box.
+    ' This naturally creates pillarbox for 4:3 content and letterbox for ultra-wide content.
+    barX = (TRICKPLAY_BOX_WIDTH - tileWidth) / 2
+    barY = (TRICKPLAY_BOX_HEIGHT - tileHeight) / 2
 
+    m.trickplayBackground.translation = [boxLeft, 0]
     m.trickplayImage.translation = [
-        sideMargin + previewX - (iconColumn * data.Width) - (data.Width / 2),
-        - (iconRow * data.Height)
+        boxLeft + barX - (iconColumn * tileWidth),
+        barY - (iconRow * tileHeight)
     ]
+
+    m.trickplayBackground.visible = true
     m.trickplayImage.visible = true
 end sub
 
-
 sub hide()
     m.trickplayImage.visible = false
+    m.trickplayBackground.visible = false
 end sub

@@ -90,13 +90,22 @@ sub onVideoContentLoaded()
 
     m.playerOSD.trickplayData = m.trickplayDataFinal
 
+    ' Remove the previous video's tiles before loading the new ones.
+    if isValid(m.currentTrickplayVideoId) and m.currentTrickplayVideoId <> ""
+        m.preloadTrickplayImagesTask.videoID = m.currentTrickplayVideoId
+        m.preloadTrickplayImagesTask.method = "REMOVE"
+        m.preloadTrickplayImagesTask.control = TaskControl.RUN
+    end if
+
     if isValidAndNotEmpty(m.trickplayDataFinal)
+        m.preloadTrickplayImagesTask.videoID = item.id
         m.preloadTrickplayImagesTask.numImagesToLoad = fix((m.trickplayDataFinal.ThumbnailCount - 1) / (m.trickplayDataFinal.TileHeight * m.trickplayDataFinal.TileWidth))
         m.preloadTrickplayImagesTask.trickplayWidth = m.trickplayDataFinal.Width
         m.preloadTrickplayImagesTask.method = "ADD"
         m.preloadTrickplayImagesTask.control = TaskControl.RUN
     end if
 
+    m.currentTrickplayVideoId = item.id
 
     m.top.PlaySessionId = item.PlaySessionId
     m.top.videoId = item.id
