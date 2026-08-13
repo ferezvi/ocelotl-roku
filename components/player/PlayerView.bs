@@ -246,6 +246,7 @@ sub onTrackSelected()
     else if selection.kind = "subtitle"
         applySubtitleTrackFields(selection.index, m.top.fullSubtitleData)
         m.top.SelectedSubtitle = selection.index
+        m.loadContentTask.selectedSubtitleIndex = selection.index
     end if
 end sub
 
