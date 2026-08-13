@@ -265,7 +265,7 @@ end sub
 sub applySubtitleContent(item as object)
     m.top.unobserveField("SelectedSubtitle")
 
-    applySubtitleTrackFields(item.SelectedSubtitle, item.fullSubtitleData)
+    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(item.SelectedSubtitle, item.fullSubtitleData)
 
     if m.top.SelectedSubtitle <> item.SelectedSubtitle
         m.top.SelectedSubtitle = item.SelectedSubtitle
@@ -279,7 +279,7 @@ end sub
 ' fields (subtitleTrack, globalCaptionMode, previousSubtitleWasEncoded).
 ' Must run BEFORE SelectedSubtitle is assigned - onSubtitleChange only reads
 ' these fields to decide whether a reload is needed, it does not set them.
-sub applySubtitleTrackFields(subtitleIndex as integer, subtitleData as object)
+function applySubtitleTrackFields(subtitleIndex as integer, subtitleData as object) as boolean
     selectedSubtitle = invalid
     for each subtitle in subtitleData
         if subtitle.Index = subtitleIndex
@@ -299,9 +299,8 @@ sub applySubtitleTrackFields(subtitleIndex as integer, subtitleData as object)
         end if
     end if
 
-    m.top.previousSubtitleWasEncoded = isValid(selectedSubtitle) and selectedSubtitle.IsEncoded
-end sub
-
+    return isValid(selectedSubtitle) and selectedSubtitle.IsEncoded
+end function
 ' onSubtitleChange: Fires whenever SelectedSubtitle changes (from the
 ' LanguagePanel or elsewhere). Most subtitle switches don't need a video
 ' reload since Roku renders them natively via subtitleTrack/globalCaptionMode -
@@ -309,8 +308,6 @@ end sub
 ' (one Roku can't render natively), since that changes which stream must be
 ' requested from the server.
 sub onSubtitleChange()
-    print "[SUB] onSubtitleChange FIRED, SelectedSubtitle="; m.top.SelectedSubtitle; " globalCaptionMode="; m.top.globalCaptionMode; " previousSubtitleWasEncoded="; m.top.previousSubtitleWasEncoded
-
     switchWithoutRefresh = true
 
     if m.top.SelectedSubtitle <> SubtitleSelection.NONE
@@ -319,15 +316,15 @@ sub onSubtitleChange()
 
     if m.top.previousSubtitleWasEncoded then switchWithoutRefresh = false
 
-    print "[SUB] switchWithoutRefresh = "; switchWithoutRefresh
-
-    if switchWithoutRefresh then return
+    if switchWithoutRefresh
+        m.top.previousSubtitleWasEncoded = false
+        return
+    end if
 
     if m.top.position <> 0
         m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
     end if
 
-    print "[SUB] Reloading with selectedSubtitleIndex = "; m.top.SelectedSubtitle
     m.top.control = VideoControl.STOP
     m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
     m.loadContentTask.itemId = m.top.id

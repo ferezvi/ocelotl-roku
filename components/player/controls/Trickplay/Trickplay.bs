@@ -66,9 +66,6 @@ sub displayTrickplayImage(position as float)
 
     previewX = m.top.previewX
 
-    print "[Trickplay] progressBarWidth="; m.top.progressBarWidth
-    print "[Trickplay] type="; type(m.top.progressBarWidth)
-
     sideMargin = (1920 - m.top.progressBarWidth) / 2
 
     m.trickplayImage.translation = [

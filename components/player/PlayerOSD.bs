@@ -13,7 +13,6 @@ sub init()
     m.progressBar = m.top.findNode("progressBar")
     m.trickplay = m.top.findNode("trickplay")
     m.trickplay.progressBarWidth = m.progressBar.trackWidth
-    print "entrando a Playerosd"
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
