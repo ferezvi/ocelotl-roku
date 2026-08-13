@@ -40,6 +40,7 @@
     </interface>
 
     <children>
+        <Group id="captionGroup" translation="[0,0]" />
         <PlayerOSD id="playerOSD" visible="false" />
         <Spinner id="playerSpinner" visible="false" translation="[897, 477]" />
         <Label id="spinnerPercentLabel" text="0%" visible="false" horizAlign="center" vertAlign="center" height="100" width="100" font="font:SmallBoldSystemFont" />

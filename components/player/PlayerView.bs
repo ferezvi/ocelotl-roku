@@ -29,6 +29,7 @@ sub init()
     m.top.observeField("position", "onVideoPositionChanged")
     m.top.observeField("duration", "onVideoPositionChanged")
     m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
+    m.top.observeField("allowCaptions", "onAllowCaptionsChange")
 
     stopLoadingSpinner()
 
@@ -117,7 +118,7 @@ sub onVideoContentLoaded()
     end if
 
     applySubtitleContent(item)
-
+    m.top.allowCaptions = not (isValid(item.subtitlesBurnedIn) and item.subtitlesBurnedIn)
     m.playerOSD.fullAudioData = item.fullAudioData
     m.playerOSD.fullSubtitleData = item.fullSubtitleData
     m.playerOSD.audioIndex = item.audioIndex
@@ -158,6 +159,10 @@ end sub
 sub onStateChanged()
     m.playerOSD.playbackState = m.top.state
 
+    if isValid(m.captionTask)
+        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
+    end if
+
     if m.top.state = MediaPlaybackState.BUFFERING
         m.playerSpinner.visible = true
         m.spinnerPercentLabel.visible = true
@@ -186,6 +191,10 @@ sub onVideoPositionChanged()
     if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
         progressBar.position = m.top.position
         progressBar.duration = m.top.duration
+    end if
+
+    if isValid(m.captionTask)
+        m.captionTask.currentPos = Int(m.top.position * 1000)
     end if
 end sub
 
@@ -301,6 +310,67 @@ function applySubtitleTrackFields(subtitleIndex as integer, subtitleData as obje
 
     return isValid(selectedSubtitle) and selectedSubtitle.IsEncoded
 end function
+
+' onAllowCaptionsChange: Sets up the custom caption overlay (captionTask +
+' captionGroup) the first time captions are allowed for this content.
+' Only takes over rendering when the user has "playback.subs.custom"
+' enabled - otherwise Roku's native subtitleTrack/globalCaptionMode
+' rendering (already wired in applySubtitleTrackFields/onSubtitleChange)
+' handles everything and this overlay stays suppressed.
+sub onAllowCaptionsChange()
+    print "[CAPTION] onAllowCaptionsChange fired, allowCaptions="; m.top.allowCaptions
+    if not m.top.allowCaptions then return
+
+    m.captionGroup = m.top.findNode("captionGroup")
+    m.captionGroup.createchildren(9, "LayoutGroup")
+    m.captionTask = createObject("roSGNode", "captionTask")
+    m.captionTask.observeField("currentCaption", "updateCaption")
+    m.top.observeField("subtitleTrack", "loadCaption")
+    m.top.observeField("globalCaptionMode", "toggleCaption")
+
+    customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
+    print "[CAPTION] playback.subs.custom setting = "; customSubsEnabled
+
+    if customSubsEnabled
+        m.top.suppressCaptions = true
+        toggleCaption()
+    else
+        m.top.suppressCaptions = false
+    end if
+end sub
+
+' loadCaption: Points captionTask at the current subtitle VTT url whenever
+' subtitleTrack changes - only relevant while suppressCaptions is on
+' (custom timing), otherwise Roku renders it natively and this is unused.
+sub loadCaption()
+    print "[CAPTION] loadCaption fired, suppressCaptions="; m.top.suppressCaptions; " subtitleTrack="; m.top.subtitleTrack
+    if m.top.suppressCaptions
+        m.captionTask.url = m.top.subtitleTrack
+    end if
+end sub
+
+' toggleCaption: Shows/hides the custom caption overlay and syncs
+' captionTask's internal state machine to the Video node's playback state.
+sub toggleCaption()
+    m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
+    print "[CAPTION] toggleCaption, state="; m.top.state; " globalCaptionMode="; m.top.globalCaptionMode
+
+    if LCase(m.top.globalCaptionMode) = "on"
+        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode + "w"
+        m.captionGroup.visible = true
+    else
+        m.captionGroup.visible = false
+    end if
+end sub
+
+' updateCaption: Replaces the rendered caption lines whenever captionTask
+' computes a new set for the current position.
+sub updateCaption()
+    print "[CAPTION] updateCaption fired, currentCaption count="; m.captionTask.currentCaption.count()
+    m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
+    m.captionGroup.appendChildren(m.captionTask.currentCaption)
+end sub
+
 ' onSubtitleChange: Fires whenever SelectedSubtitle changes (from the
 ' LanguagePanel or elsewhere). Most subtitle switches don't need a video
 ' reload since Roku renders them natively via subtitleTrack/globalCaptionMode -
