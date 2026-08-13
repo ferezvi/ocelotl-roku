@@ -57,6 +57,10 @@ end sub
 function LoadItems_VideoPlayer(id as string, mediaSourceId = invalid as dynamic, audio_stream_idx = 1 as integer) as dynamic
 
     video = {}
+    ' Default so callers always get a boolean, even outside the transcode
+    ' burn-in branch below. TODO(PR): remove the redundant "= false" in that
+    ' branch once this lands.
+    video.subtitlesBurnedIn = false
     video.id = id
     video.content = createObject("RoSGNode", "ContentNode")
 
