@@ -66,7 +66,6 @@ sub onVideoContentLoaded()
     m.loadContentTask.content = []
 
     if not isValid(videoContent) or not isValid(videoContent[0])
-        print "[PlayerView] failed to load playback data"
         m.top.backPressed = true
         return
     end if
@@ -318,7 +317,6 @@ end function
 ' rendering (already wired in applySubtitleTrackFields/onSubtitleChange)
 ' handles everything and this overlay stays suppressed.
 sub onAllowCaptionsChange()
-    print "[CAPTION] onAllowCaptionsChange fired, allowCaptions="; m.top.allowCaptions
     if not m.top.allowCaptions then return
 
     m.captionGroup = m.top.findNode("captionGroup")
@@ -329,7 +327,6 @@ sub onAllowCaptionsChange()
     m.top.observeField("globalCaptionMode", "toggleCaption")
 
     customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
-    print "[CAPTION] playback.subs.custom setting = "; customSubsEnabled
 
     if customSubsEnabled
         m.top.suppressCaptions = true
@@ -343,7 +340,6 @@ end sub
 ' subtitleTrack changes - only relevant while suppressCaptions is on
 ' (custom timing), otherwise Roku renders it natively and this is unused.
 sub loadCaption()
-    print "[CAPTION] loadCaption fired, suppressCaptions="; m.top.suppressCaptions; " subtitleTrack="; m.top.subtitleTrack
     if m.top.suppressCaptions
         m.captionTask.url = m.top.subtitleTrack
     end if
@@ -353,7 +349,6 @@ end sub
 ' captionTask's internal state machine to the Video node's playback state.
 sub toggleCaption()
     m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
-    print "[CAPTION] toggleCaption, state="; m.top.state; " globalCaptionMode="; m.top.globalCaptionMode
 
     if LCase(m.top.globalCaptionMode) = "on"
         m.captionTask.playerState = m.top.state + m.top.globalCaptionMode + "w"
@@ -366,7 +361,6 @@ end sub
 ' updateCaption: Replaces the rendered caption lines whenever captionTask
 ' computes a new set for the current position.
 sub updateCaption()
-    print "[CAPTION] updateCaption fired, currentCaption count="; m.captionTask.currentCaption.count()
     m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
     m.captionGroup.appendChildren(m.captionTask.currentCaption)
 end sub
