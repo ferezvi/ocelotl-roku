@@ -463,8 +463,17 @@ end function
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
+    ' Handle PLAY key before any OSD visibility check
+    if isStringEqual(key, KeyCode.PLAY)
+        print "PlayerView: PLAY captured"
+        handlePlayKey()
+        return true
+    end if
+
+    ' Ignore all other keys when OSD is visible (they go to OSD children)
     if m.playerOSD.visible then return false
 
+    ' Handle keys when OSD is hidden
     if isStringEqual(key, KeyCode.OK)
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
             m.top.control = VideoControl.PAUSE
@@ -494,6 +503,26 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
+
+' Helper function for PLAY key behavior
+sub handlePlayKey()
+    if not m.playerOSD.visible
+        ' OSD hidden: pause (if playing) and show OSD
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        end if
+        m.playerOSD.visible = true
+        m.playerOSD.callFunc("focusControls")
+    else
+        ' OSD visible: toggle playback without touching OSD
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
+            m.top.control = VideoControl.RESUME
+        end if
+        ' OSD stays visible
+    end if
+end sub
 
 sub onOSDAction(event as object)
     action = event.getData()
@@ -555,3 +584,19 @@ function max(a as float, b as float) as float
     if a > b then return a
     return b
 end function
+
+sub manejarPlay()
+    if not m.playerOSD.visible
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        end if
+        m.playerOSD.visible = true
+        m.playerOSD.callFunc("focusControls")
+    else
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
+            m.top.control = VideoControl.RESUME
+        end if
+    end if
+end sub
