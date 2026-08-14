@@ -12,34 +12,39 @@ const SCREEN_WIDTH = 1920
 const TRICKPLAY_MAX_MOSAIC_WIDTH = 1920
 const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1080
 
+' Fixed on-screen preview box (16:9). Tiles of any source aspect ratio
+' are scaled with "contain" fit inside this box, with a background
+' rectangle showing through as letterbox/pillarbox bars.
 const TRICKPLAY_BOX_WIDTH = 320
 const TRICKPLAY_BOX_HEIGHT = 180
+
 
 ' ============================================================
 ' LIFECYCLE
 ' ============================================================
 
 sub init()
-
-    ' Reference to the fixed-size box background used for letterbox/pillarbox bars.
-    m.trickplayBoxBackground = m.top.findNode("trickplayBoxBackground")
-
     m.trickplayDataFinal = invalid
+
+    m.trickplayBoxBackground = m.top.findNode("trickplayBoxBackground")
 
     m.trickplayImages = [
         m.top.findNode("trickplayImage0"),
-        m.top.findNode("trickplayImage1"),
-        m.top.findNode("trickplayImage2")
+        m.top.findNode("trickplayImage1")
     ]
 
     m.trickplayActiveBuffer = -1
-    m.trickplayBufferTiles = [-1, -1, -1]
-    m.trickplayBufferLoading = [false, false, false]
+    m.trickplayBufferTiles = [-1, -1]
+    m.trickplayBufferLoading = [false, false]
 
     m.trickplayCurrentTile = -1
     m.trickplayCurrentThumbnail = -1
     m.trickplayTargetTile = -1
     m.trickplayTargetThumbnail = -1
+
+    ' Tracks the last global thumbnail index to detect scrub direction
+    ' for hysteresis-based neighbor preloading.
+    m.trickplayLastIconIndex = -1
 
     m.iconInterval = 0
 
@@ -159,7 +164,7 @@ end sub
 sub resetTrickplayBuffers()
     m.trickplayBoxBackground.visible = false
 
-    for i = 0 to 2
+    for i = 0 to 1
         m.trickplayImages[i].visible = false
         m.trickplayImages[i].uri = ""
 
@@ -172,11 +177,12 @@ sub resetTrickplayBuffers()
     m.trickplayCurrentThumbnail = -1
     m.trickplayTargetTile = -1
     m.trickplayTargetThumbnail = -1
+    m.trickplayLastIconIndex = -1
 end sub
 
 
 function getTrickplayBufferForTile(tileIndex as integer) as integer
-    for i = 0 to 2
+    for i = 0 to 1
         if m.trickplayBufferTiles[i] = tileIndex and not m.trickplayBufferLoading[i]
             return i
         end if
@@ -187,7 +193,7 @@ end function
 
 
 function getTrickplayBufferLoadingTile(tileIndex as integer) as integer
-    for i = 0 to 2
+    for i = 0 to 1
         if m.trickplayBufferTiles[i] = tileIndex and m.trickplayBufferLoading[i]
             return i
         end if
@@ -199,14 +205,14 @@ end function
 
 function getTrickplayFreeBuffer() as integer
     ' Prefer an unused buffer.
-    for i = 0 to 2
+    for i = 0 to 1
         if m.trickplayBufferTiles[i] < 0 and not m.trickplayBufferLoading[i]
             return i
         end if
     end for
 
     ' Never replace the active buffer.
-    for i = 0 to 2
+    for i = 0 to 1
         if i <> m.trickplayActiveBuffer and not m.trickplayBufferLoading[i]
             return i
         end if
@@ -225,7 +231,7 @@ sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
         return
     end if
 
-    if bufferIndex < 0 or bufferIndex > 2
+    if bufferIndex < 0 or bufferIndex > 1
         return
     end if
 
@@ -273,7 +279,10 @@ end sub
 ' NEIGHBOR PRELOADING
 ' ============================================================
 
-sub prepareTrickplayNeighbors(tileIndex as integer)
+' Preload the neighbor tile only once the scrub has committed past the
+' midpoint of the current tile in a consistent direction. This avoids
+' thrashing the single free buffer slot on small back-and-forth movement.
+sub prepareTrickplayNeighbors(tileIndex as integer, tileIconIndex as integer)
     if not isValidAndNotEmpty(m.trickplayDataFinal)
         return
     end if
@@ -288,29 +297,42 @@ sub prepareTrickplayNeighbors(tileIndex as integer)
 
     maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
 
-    ' Previous tile.
-    previousTile = tileIndex - 1
+    globalIconIndex = (tileIndex * thumbnailsPerTile) + tileIconIndex
 
-    if previousTile >= 0
-        if getTrickplayBufferForTile(previousTile) < 0 and getTrickplayBufferLoadingTile(previousTile) < 0
-            bufferIndex = getTrickplayFreeBuffer()
+    direction = 0
 
-            if bufferIndex >= 0
-                loadTrickplayTile(previousTile, bufferIndex)
-            end if
+    if m.trickplayLastIconIndex >= 0
+        if globalIconIndex > m.trickplayLastIconIndex
+            direction = 1
+        else if globalIconIndex < m.trickplayLastIconIndex
+            direction = -1
         end if
     end if
 
-    ' Next tile.
-    nextTile = tileIndex + 1
+    m.trickplayLastIconIndex = globalIconIndex
 
-    if nextTile <= maxTileIndex
-        if getTrickplayBufferForTile(nextTile) < 0 and getTrickplayBufferLoadingTile(nextTile) < 0
-            bufferIndex = getTrickplayFreeBuffer()
+    if direction = 0
+        return
+    end if
 
-            if bufferIndex >= 0
-                loadTrickplayTile(nextTile, bufferIndex)
-            end if
+    halfPoint = thumbnailsPerTile / 2
+    neighborTile = -1
+
+    if direction = 1 and tileIconIndex >= halfPoint
+        neighborTile = tileIndex + 1
+    else if direction = -1 and tileIconIndex <= halfPoint
+        neighborTile = tileIndex - 1
+    end if
+
+    if neighborTile < 0 or neighborTile > maxTileIndex
+        return
+    end if
+
+    if getTrickplayBufferForTile(neighborTile) < 0 and getTrickplayBufferLoadingTile(neighborTile) < 0
+        bufferIndex = getTrickplayFreeBuffer()
+
+        if bufferIndex >= 0
+            loadTrickplayTile(neighborTile, bufferIndex)
         end if
     end if
 end sub
@@ -321,7 +343,7 @@ end sub
 ' ============================================================
 
 sub showTrickplayBuffer(bufferIndex as integer, tileIndex as integer)
-    if bufferIndex < 0 or bufferIndex > 2
+    if bufferIndex < 0 or bufferIndex > 1
         return
     end if
 
@@ -348,6 +370,25 @@ end sub
 ' ============================================================
 ' MAIN UPDATE
 ' ============================================================
+
+' Computes "contain" scale and centering padding to fit a tile inside the fixed box.
+function calculateTrickplayBoxFit(data as object) as object
+    scaleX = TRICKPLAY_BOX_WIDTH / data.Width
+    scaleY = TRICKPLAY_BOX_HEIGHT / data.Height
+
+    ' The smaller factor guarantees the tile fits fully without cropping.
+    fitScale = scaleX < scaleY ? scaleX : scaleY
+
+    scaledWidth = data.Width * fitScale
+    scaledHeight = data.Height * fitScale
+
+    return {
+        scale: fitScale,
+        padX: (TRICKPLAY_BOX_WIDTH - scaledWidth) / 2,
+        padY: (TRICKPLAY_BOX_HEIGHT - scaledHeight) / 2
+    }
+end function
+
 
 sub updateTrickplay(trickPosition as float)
     if not isValidAndNotEmpty(m.trickplayDataFinal)
@@ -487,6 +528,8 @@ sub updateTrickplay(trickPosition as float)
     ' Position the fixed-size box background at the same screen anchor as the preview.
     m.trickplayBoxBackground.translation = [boxX, boxY]
 
+    ' --------------------------------------------------------
+
     ' Switch buffer.
     if m.trickplayActiveBuffer <> bufferIndex
         showTrickplayBuffer(bufferIndex, tileIndex)
@@ -497,15 +540,16 @@ sub updateTrickplay(trickPosition as float)
     m.trickplayCurrentTile = tileIndex
     m.trickplayCurrentThumbnail = iconIndex
 
-    prepareTrickplayNeighbors(tileIndex)
+    prepareTrickplayNeighbors(tileIndex, tileIconIndex)
 end sub
+
 
 ' ============================================================
 ' IMAGE LOADING
 ' ============================================================
 
 sub onTrickplayImageLoadStatusChanged()
-    for i = 0 to 2
+    for i = 0 to 1
         trickplayImage = m.trickplayImages[i]
         status = LCase(trickplayImage.loadStatus)
 
@@ -515,14 +559,17 @@ sub onTrickplayImageLoadStatusChanged()
 
             tileIndex = m.trickplayBufferTiles[i]
 
-            ' Requested tile is now ready.
-            if tileIndex = m.trickplayTargetTile
+            ' Retry against the current target whenever ANY buffer frees up
+            ' during an active seek. The tile that just finished loading may
+            ' not be the current target anymore, but freeing this slot might
+            ' be exactly what unblocks loading the real target tile.
+            if m.top.isSeeking
                 updateTrickplay(m.top.previewPosition)
             end if
 
             ' Keep neighbors prepared.
             if tileIndex = m.trickplayCurrentTile
-                prepareTrickplayNeighbors(tileIndex)
+                prepareTrickplayNeighbors(tileIndex, m.trickplayCurrentThumbnail - (tileIndex * (m.trickplayDataFinal.TileHeight * m.trickplayDataFinal.TileWidth)))
             end if
 
         else if status = "failed"
@@ -532,6 +579,11 @@ sub onTrickplayImageLoadStatusChanged()
             if i <> m.trickplayActiveBuffer
                 m.trickplayBufferTiles[i] = -1
                 trickplayImage.uri = ""
+            end if
+
+            ' Same retry logic on failure, so a stuck slot doesn't stall the preview.
+            if m.top.isSeeking
+                updateTrickplay(m.top.previewPosition)
             end if
 
         end if
@@ -578,21 +630,3 @@ sub onTrickplayPreviewPositionChanged()
 
     updateTrickplay(m.top.previewPosition)
 end sub
-
-' Computes "contain" scale and centering padding to fit a tile inside the fixed box.
-function calculateTrickplayBoxFit(data as object) as object
-    scaleX = TRICKPLAY_BOX_WIDTH / data.Width
-    scaleY = TRICKPLAY_BOX_HEIGHT / data.Height
-
-    ' The smaller factor guarantees the tile fits fully without cropping.
-    fitScale = scaleX < scaleY ? scaleX : scaleY
-
-    scaledWidth = data.Width * fitScale
-    scaledHeight = data.Height * fitScale
-
-    return {
-        scale: fitScale,
-        padX: (TRICKPLAY_BOX_WIDTH - scaledWidth) / 2,
-        padY: (TRICKPLAY_BOX_HEIGHT - scaledHeight) / 2
-    }
-end function
