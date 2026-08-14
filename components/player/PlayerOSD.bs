@@ -17,7 +17,7 @@ sub init()
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
     m.synopsisPanel = m.top.findNode("synopsisPanel")
-
+    m.trickplay.visible = false
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
 
