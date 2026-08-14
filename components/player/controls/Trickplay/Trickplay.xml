@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <component name="Trickplay" extends="Group">
+
     <interface>
-        <field id="position" type="float" alwaysNotify="true" />
-        <field id="trickplayData" type="assocarray" />
         <field id="videoId" type="string" />
-        <field id="previewX" type="float" alwaysNotify="true" />
-        <field id="progressBarWidth" type="float" value="0" />
+        <field id="trickplay" type="assocarray" />
+        <field id="duration" type="float" />
+        <field id="previewPosition" type="float" />
+        <field id="isSeeking" type="boolean" />
     </interface>
 
     <children>
-        <Timer id="throttleTimer" />
-        <Rectangle id="trickplayBackground" color="0xff0000FF" visible="false" />
-        <Poster id="trickplayImageA" visible="false" translation="[0, 0]" loadDisplayMode="limitSize" />
-        <Poster id="trickplayImageB" visible="false" translation="[0, 0]" loadDisplayMode="limitSize" />
+        <Poster id="trickplayImage0" visible="false" />
+        <Poster id="trickplayImage1" visible="false" />
+        <Poster id="trickplayImage2" visible="false" />
     </children>
 
 </component>

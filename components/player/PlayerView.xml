@@ -42,9 +42,7 @@
     <children>
         <timer id="playbackTimer" repeat="true" duration="30" />
         <Group id="captionGroup" translation="[0,0]" />
-        <Poster id="trickplayImage0" visible="false" />
-        <Poster id="trickplayImage1" visible="false" />
-        <Poster id="trickplayImage2" visible="false" />
+        <Trickplay id="trickplay" />
         <PlayerOSD id="playerOSD" visible="false" />
         <Spinner id="playerSpinner" visible="false" translation="[897, 477]" />
         <Label id="spinnerPercentLabel" text="0%" visible="false" horizAlign="center" vertAlign="center" height="100" width="100" font="font:SmallBoldSystemFont" />

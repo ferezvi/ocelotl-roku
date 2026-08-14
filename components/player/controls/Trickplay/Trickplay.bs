@@ -1,462 +1,539 @@
 import "pkg:/source/utils/misc.bs"
 
+' ============================================================
+' CONSTANTS
+' ============================================================
+
 const SCREEN_WIDTH = 1920
 
-' Fixed preview box (object-fit: contain).
-const TRICKPLAY_BOX_WIDTH = 320
-const TRICKPLAY_BOX_HEIGHT = 180
 
-' Maximum decoded mosaic dimensions.
-'
-' This controls texture memory only.
-' It does NOT change the visual size of the preview.
-const TRICKPLAY_MAX_MOSAIC_WIDTH = 1600
-const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1200
-
-' Minimum time between two consecutive "new mosaic" texture loads while
-' scrubbing continuously. The very first crossing into a new mosaic is
-' NOT throttled (it fires immediately); this only caps the cadence of
-' further reloads if the user keeps scrubbing across more mosaics before
-' the previous one finished loading.
-const TRICKPLAY_LOAD_THROTTLE_SECONDS = 0.200
-
+' ============================================================
+' LIFECYCLE
+' ============================================================
 
 sub init()
-    m.trickplayImageA = m.top.findNode("trickplayImageA")
-    m.trickplayImageB = m.top.findNode("trickplayImageB")
-    m.trickplayBackground = m.top.findNode("trickplayBackground")
-    m.throttleTimer = m.top.findNode("throttleTimer")
+    m.trickplayDataFinal = invalid
 
-    m.trickplayBackground.width = TRICKPLAY_BOX_WIDTH
-    m.trickplayBackground.height = TRICKPLAY_BOX_HEIGHT
+    m.trickplayImages = [
+        m.top.findNode("trickplayImage0"),
+        m.top.findNode("trickplayImage1"),
+        m.top.findNode("trickplayImage2")
+    ]
 
-    m.throttleTimer.repeat = false
-    m.throttleTimer.duration = TRICKPLAY_LOAD_THROTTLE_SECONDS
+    m.trickplayActiveBuffer = -1
+    m.trickplayBufferTiles = [-1, -1, -1]
+    m.trickplayBufferLoading = [false, false, false]
 
-    ' A starts as the active buffer.
-    m.activeImage = m.trickplayImageA
-    m.loadingImage = m.trickplayImageB
+    m.trickplayCurrentTile = -1
+    m.trickplayCurrentThumbnail = -1
+    m.trickplayTargetTile = -1
+    m.trickplayTargetThumbnail = -1
 
-    ' True when the loading buffer is A.
-    ' False when the loading buffer is B.
-    m.loadingIsA = false
+    m.iconInterval = 0
 
-    m.activeTileIndex = -1
-    m.loadingTileIndex = -1
+    for each trickplayImage in m.trickplayImages
+        trickplayImage.visible = false
+        trickplayImage.observeField("loadStatus", "onTrickplayImageLoadStatusChanged")
+    end for
 
-    m.activeTileUri = ""
-    m.loadingTileUri = ""
+    m.top.observeField("videoId", "onTrickplayDataChanged")
+    m.top.observeField("trickplay", "onTrickplayDataChanged")
+    m.top.observeField("duration", "onTrickplayDurationChanged")
+    m.top.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
+    m.top.observeField("isSeeking", "onTrickplaySeekingChanged")
 
-    ' "Requested" always reflects the most recent position the user
-    ' scrubbed to, whether or not a load has actually started for it yet.
-    m.requestedTileIndex = -1
-    m.requestedTileUri = ""
-    m.requestedTranslation = [0, 0]
-    m.requestedClippingRect = [0, 0, 0, 0]
-    m.requestedMosaicWidth = 0
-    m.requestedMosaicHeight = 0
-    m.requestedLoadWidth = 0
-    m.requestedLoadHeight = 0
-
-    ' True while we are inside a throttle window and a re-arm is pending.
-    m.throttleActive = false
-
-    m.top.observeField("position", "onPositionChanged")
-    m.top.observeField("trickplayData", "onTrickplayDataChanged")
-
-    m.trickplayImageA.observeField("loadStatus", "onImageALoadStatus")
-    m.trickplayImageB.observeField("loadStatus", "onImageBLoadStatus")
-
-    m.throttleTimer.observeField("fire", "onThrottleTimerFire")
 end sub
 
 
-sub onPositionChanged()
-    if not isValid(m.top.trickplayData) then return
-    if not isValid(m.top.position) then return
+' ============================================================
+' PUBLIC API
+' ============================================================
 
-    displayTrickplayImage(m.top.position)
+sub reset()
+    resetTrickplayBuffers()
 end sub
 
+
+' ============================================================
+' PARENT / PLAYER OSD
+' ============================================================
+
+function getPlayerOSD() as object
+    playerView = m.top.getParent()
+
+    if not isValid(playerView)
+        return invalid
+    end if
+
+    return playerView.findNode("playerOSD")
+end function
+
+
+function getProgressBar() as object
+    playerOSD = getPlayerOSD()
+
+    if not isValid(playerOSD)
+        return invalid
+    end if
+
+    return playerOSD.findNode("progressBar")
+end function
+
+
+' ============================================================
+' TRICKPLAY DATA
+' ============================================================
 
 sub onTrickplayDataChanged()
-    if not isValid(m.top.trickplayData)
-        hide()
+    m.trickplayDataFinal = invalid
+    m.iconInterval = 0
+
+
+
+    trickplay = m.top.trickplay
+
+    if not isValidAndNotEmpty(trickplay)
+        resetTrickplayBuffers()
         return
     end if
 
-    m.activeTileIndex = -1
-    m.loadingTileIndex = -1
+    videoId = m.top.videoId
 
-    m.activeTileUri = ""
-    m.loadingTileUri = ""
+    if not isValidAndNotEmpty(videoId)
+        resetTrickplayBuffers()
+        return
+    end if
 
-    m.requestedTileIndex = -1
-    m.requestedTileUri = ""
+    trickplayData = trickplay.LookupCI(videoId)
 
-    m.activeImage = m.trickplayImageA
-    m.loadingImage = m.trickplayImageB
-    m.loadingIsA = false
+    if not isValidAndNotEmpty(trickplayData)
+        resetTrickplayBuffers()
+        return
+    end if
 
-    m.trickplayImageA.visible = false
-    m.trickplayImageB.visible = false
+    keys = trickplayData.keys()
 
-    m.trickplayImageA.uri = ""
-    m.trickplayImageB.uri = ""
+    if keys.count() = 0
+        resetTrickplayBuffers()
+        return
+    end if
 
-    m.throttleActive = false
-    m.throttleTimer.control = "stop"
+    m.trickplayDataFinal = trickplayData.lookupCI(keys[0])
 
-    if isValid(m.top.position)
-        displayTrickplayImage(m.top.position)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        resetTrickplayBuffers()
+        return
+    end if
+
+    if not isValid(m.trickplayDataFinal.Interval)
+        resetTrickplayBuffers()
+        return
+    end if
+
+    m.iconInterval = m.trickplayDataFinal.Interval / 1000
+
+    resetTrickplayBuffers()
+end sub
+
+
+sub onTrickplayDurationChanged()
+    if m.top.isSeeking
+        updateTrickplay(m.top.previewPosition)
     end if
 end sub
 
 
-sub displayTrickplayImage(position as float)
-    data = m.top.trickplayData
+' ============================================================
+' BUFFERS
+' ============================================================
 
-    if not isValid(data) then return
+sub resetTrickplayBuffers()
+    for i = 0 to 2
+        m.trickplayImages[i].visible = false
+        m.trickplayImages[i].uri = ""
 
-    interval = data.Interval / 1000.0
+        m.trickplayBufferTiles[i] = -1
+        m.trickplayBufferLoading[i] = false
+    end for
 
-    if interval <= 0 then return
+    m.trickplayActiveBuffer = -1
+    m.trickplayCurrentTile = -1
+    m.trickplayCurrentThumbnail = -1
+    m.trickplayTargetTile = -1
+    m.trickplayTargetThumbnail = -1
+end sub
 
-    iconIndex = fix(position / interval)
 
-    tilesPerImage = data.TileHeight * data.TileWidth
+function getTrickplayBufferForTile(tileIndex as integer) as integer
+    for i = 0 to 2
+        if m.trickplayBufferTiles[i] = tileIndex and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
 
-    if tilesPerImage <= 0 then return
+    return -1
+end function
 
-    tileIndex = fix(iconIndex / tilesPerImage)
-    tileIconIndex = iconIndex - (tileIndex * tilesPerImage)
+
+function getTrickplayBufferLoadingTile(tileIndex as integer) as integer
+    for i = 0 to 2
+        if m.trickplayBufferTiles[i] = tileIndex and m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    return -1
+end function
+
+
+function getTrickplayFreeBuffer() as integer
+    ' Prefer an unused buffer.
+    for i = 0 to 2
+        if m.trickplayBufferTiles[i] < 0 and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    ' Never replace the active buffer.
+    for i = 0 to 2
+        if i <> m.trickplayActiveBuffer and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    return -1
+end function
+
+
+' ============================================================
+' LOADING
+' ============================================================
+
+sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    if bufferIndex < 0 or bufferIndex > 2
+        return
+    end if
+
+    if tileIndex < 0
+        return
+    end if
+
+    data = m.trickplayDataFinal
+    trickplayImage = m.trickplayImages[bufferIndex]
+
+    trickplayImage.visible = false
+
+    m.trickplayBufferTiles[bufferIndex] = tileIndex
+    m.trickplayBufferLoading[bufferIndex] = true
+
+    trickplayImage.width = data.Width * data.TileWidth
+    trickplayImage.height = data.Height * data.TileHeight
+
+    trickplayImage.uri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
+end sub
+
+
+' ============================================================
+' NEIGHBOR PRELOADING
+' ============================================================
+
+sub prepareTrickplayNeighbors(tileIndex as integer)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    data = m.trickplayDataFinal
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        return
+    end if
+
+    maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
+
+    ' Previous tile.
+    previousTile = tileIndex - 1
+
+    if previousTile >= 0
+        if getTrickplayBufferForTile(previousTile) < 0 and getTrickplayBufferLoadingTile(previousTile) < 0
+            bufferIndex = getTrickplayFreeBuffer()
+
+            if bufferIndex >= 0
+                loadTrickplayTile(previousTile, bufferIndex)
+            end if
+        end if
+    end if
+
+    ' Next tile.
+    nextTile = tileIndex + 1
+
+    if nextTile <= maxTileIndex
+        if getTrickplayBufferForTile(nextTile) < 0 and getTrickplayBufferLoadingTile(nextTile) < 0
+            bufferIndex = getTrickplayFreeBuffer()
+
+            if bufferIndex >= 0
+                loadTrickplayTile(nextTile, bufferIndex)
+            end if
+        end if
+    end if
+end sub
+
+
+' ============================================================
+' BUFFER SWITCHING
+' ============================================================
+
+sub showTrickplayBuffer(bufferIndex as integer, tileIndex as integer)
+    if bufferIndex < 0 or bufferIndex > 2
+        return
+    end if
+
+    if m.trickplayBufferTiles[bufferIndex] <> tileIndex
+        return
+    end if
+
+    oldBuffer = m.trickplayActiveBuffer
+
+    ' Show the new buffer first.
+    m.trickplayImages[bufferIndex].visible = true
+    m.trickplayActiveBuffer = bufferIndex
+
+    ' Hide the previous buffer afterwards.
+    if oldBuffer >= 0 and oldBuffer <> bufferIndex
+        m.trickplayImages[oldBuffer].visible = false
+    end if
+
+    m.trickplayCurrentTile = tileIndex
+end sub
+
+
+' ============================================================
+' MAIN UPDATE
+' ============================================================
+
+sub updateTrickplay(trickPosition as float)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    if m.iconInterval <= 0
+        return
+    end if
+
+    if m.top.duration <= 0
+        return
+    end if
+
+    data = m.trickplayDataFinal
+
+    ' Clamp position.
+    if trickPosition < 0
+        trickPosition = 0
+    else if trickPosition > m.top.duration
+        trickPosition = m.top.duration
+    end if
+
+    ' Calculate thumbnail index.
+    iconIndex = fix(trickPosition / m.iconInterval)
+
+    if iconIndex >= data.ThumbnailCount
+        iconIndex = data.ThumbnailCount - 1
+    end if
+
+    if iconIndex < 0
+        iconIndex = 0
+    end if
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        return
+    end if
+
+    tileIndex = fix(iconIndex / thumbnailsPerTile)
+
+    tileIconIndex = iconIndex - (tileIndex * thumbnailsPerTile)
 
     iconRow = fix(tileIconIndex / data.TileWidth)
     iconColumn = tileIconIndex mod data.TileWidth
 
-    ' ------------------------------------------------------------
-    ' DISPLAY SCALE
-    '
-    ' Controls only the final on-screen size.
-    ' ------------------------------------------------------------
+    m.trickplayTargetTile = tileIndex
+    m.trickplayTargetThumbnail = iconIndex
 
-    displayScale = TRICKPLAY_BOX_HEIGHT / data.Height
-    displayScaleAlt = TRICKPLAY_BOX_WIDTH / data.Width
+    ' --------------------------------------------------------
+    ' Find requested tile.
+    ' --------------------------------------------------------
 
-    if displayScaleAlt < displayScale
-        displayScale = displayScaleAlt
-    end if
+    bufferIndex = getTrickplayBufferForTile(tileIndex)
 
-    tileWidth = data.Width * displayScale
-    tileHeight = data.Height * displayScale
+    if bufferIndex < 0
+        loadingBuffer = getTrickplayBufferLoadingTile(tileIndex)
 
-    mosaicWidth = data.Width * data.TileWidth * displayScale
-    mosaicHeight = data.Height * data.TileHeight * displayScale
-
-    ' ------------------------------------------------------------
-    ' LOAD SCALE
-    '
-    ' Controls only decoded texture size.
-    ' ------------------------------------------------------------
-
-    loadMosaicWidth = mosaicWidth
-    loadMosaicHeight = mosaicHeight
-
-    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
-    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
-
-    if loadCapScaleAlt < loadCapScale
-        loadCapScale = loadCapScaleAlt
-    end if
-
-    if loadCapScale < 1.0
-        loadMosaicWidth = mosaicWidth * loadCapScale
-        loadMosaicHeight = mosaicHeight * loadCapScale
-    else
-        loadCapScale = 1.0
-    end if
-
-    tileUri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
-
-    ' ------------------------------------------------------------
-    ' PREVIEW POSITION
-    ' ------------------------------------------------------------
-
-    previewX = m.top.previewX
-
-    sideMargin = (SCREEN_WIDTH - m.top.progressBarWidth) / 2
-    boxLeft = sideMargin + previewX - (TRICKPLAY_BOX_WIDTH / 2)
-
-    ' Center selected tile inside fixed preview box.
-    barX = (TRICKPLAY_BOX_WIDTH - tileWidth) / 2
-    barY = (TRICKPLAY_BOX_HEIGHT - tileHeight) / 2
-
-    imageTranslation = [
-        boxLeft + barX - (iconColumn * tileWidth),
-        barY - (iconRow * tileHeight)
-    ]
-
-    ' ------------------------------------------------------------
-    ' IMPORTANT:
-    '
-    ' clippingRect is expressed in the DECODED TEXTURE coordinate
-    ' system, not in the final display coordinate system.
-    '
-    ' Therefore, when the texture is decoded smaller, the clipping
-    ' rectangle must be scaled by loadCapScale as well.
-    ' ------------------------------------------------------------
-
-    loadTileWidth = tileWidth * loadCapScale
-    loadTileHeight = tileHeight * loadCapScale
-
-    imageClippingRect = [
-        iconColumn * loadTileWidth,
-        iconRow * loadTileHeight,
-        loadTileWidth,
-        loadTileHeight
-    ]
-
-    m.trickplayBackground.translation = [boxLeft, 0]
-    m.trickplayBackground.visible = true
-
-    ' Always remember the most recent requested target, whether or not
-    ' a load actually starts for it right now. The throttle timer uses
-    ' this to pick up the latest position once its window elapses.
-    m.requestedTileIndex = tileIndex
-    m.requestedTileUri = tileUri
-    m.requestedTranslation = imageTranslation
-    m.requestedClippingRect = imageClippingRect
-    m.requestedMosaicWidth = mosaicWidth
-    m.requestedMosaicHeight = mosaicHeight
-    m.requestedLoadWidth = loadMosaicWidth
-    m.requestedLoadHeight = loadMosaicHeight
-
-    ' ------------------------------------------------------------
-    ' CASE 0: requested tile belongs to the mosaic that is currently
-    ' ACTIVE on screen.
-    '
-    ' This is just moving the crop window inside an already-decoded
-    ' texture, so it is cheap and must stay immediate/unthrottled.
-    '
-    ' CRITICAL: only the active buffer is touched here. The loading
-    ' buffer (if any) is left completely alone, so a texture that is
-    ' still decoding never gets reassigned to a different target tile.
-    ' ------------------------------------------------------------
-
-    if tileIndex = m.activeTileIndex
-        configureImage(m.activeImage, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
-        return
-    end if
-
-    ' ------------------------------------------------------------
-    ' CASE 1: requested tile belongs to the mosaic that is already
-    ' loading.
-    '
-    ' The loading buffer is invisible at this point, so repositioning
-    ' it has no visual effect - safe to do on every tick.
-    ' ------------------------------------------------------------
-
-    if tileIndex = m.loadingTileIndex
-        configureImage(m.loadingImage, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
-
-        if m.loadingImage.loadStatus = "ready"
-            onLoadingImageReady()
+        if loadingBuffer >= 0
+            ' Keep the current image visible while loading.
+            return
         end if
 
+        bufferIndex = getTrickplayFreeBuffer()
+
+        if bufferIndex < 0
+            return
+        end if
+
+        loadTrickplayTile(tileIndex, bufferIndex)
         return
     end if
 
-    ' ------------------------------------------------------------
-    ' CASE 2: the mosaic is already fully decoded in the OTHER buffer
-    ' (the user scrubbed back into a mosaic seen earlier). This is
-    ' effectively free (no decode needed), so it also bypasses the
-    ' throttle and swaps in right away.
-    ' ------------------------------------------------------------
+    ' --------------------------------------------------------
+    ' Calculate preview position.
+    ' --------------------------------------------------------
 
-    if m.trickplayImageA.uri = tileUri and m.trickplayImageA.loadStatus = "ready"
-        promoteReadyBuffer(m.trickplayImageA, true, tileIndex, tileUri, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+    previewPosPercentage = 0
+
+    if m.top.duration > 0
+        previewPosPercentage = trickPosition / m.top.duration
+    end if
+
+    if previewPosPercentage < 0
+        previewPosPercentage = 0
+    else if previewPosPercentage > 1
+        previewPosPercentage = 1
+    end if
+
+    progressBar = getProgressBar()
+    playerOSD = getPlayerOSD()
+
+    if not isValid(progressBar) or not isValid(playerOSD)
         return
     end if
 
-    if m.trickplayImageB.uri = tileUri and m.trickplayImageB.loadStatus = "ready"
-        promoteReadyBuffer(m.trickplayImageB, false, tileIndex, tileUri, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+    trackWidth = progressBar.trackWidth
+
+    progressX = playerOSD.translation[0] + progressBar.translation[0] + (trackWidth * previewPosPercentage)
+    progressY = playerOSD.translation[1] + progressBar.translation[1]
+
+    offsetHoriz = progressX - (data.Width / 2)
+    offsetVert = progressY - 25 - data.Height
+
+    ' Keep preview inside the screen.
+    if offsetHoriz < 0
+        offsetHoriz = 0
+    end if
+
+    if offsetHoriz + data.Width > SCREEN_WIDTH
+        offsetHoriz = SCREEN_WIDTH - data.Width
+    end if
+
+    trickplayImage = m.trickplayImages[bufferIndex]
+
+    trickplayImage.width = data.Width * data.TileWidth
+    trickplayImage.height = data.Height * data.TileHeight
+
+    trickplayImage.translation = [
+        offsetHoriz - (iconColumn * data.Width),
+        offsetVert - (iconRow * data.Height)
+    ]
+
+    trickplayImage.clippingRect = [
+        iconColumn * data.Width,
+        iconRow * data.Height,
+        data.Width,
+        data.Height
+    ]
+
+    ' Switch buffer.
+    if m.trickplayActiveBuffer <> bufferIndex
+        showTrickplayBuffer(bufferIndex, tileIndex)
+    else
+        trickplayImage.visible = true
+    end if
+
+    m.trickplayCurrentTile = tileIndex
+    m.trickplayCurrentThumbnail = iconIndex
+
+    ' Prepare adjacent tiles.
+    prepareTrickplayNeighbors(tileIndex)
+end sub
+
+
+' ============================================================
+' IMAGE LOADING
+' ============================================================
+
+sub onTrickplayImageLoadStatusChanged()
+    for i = 0 to 2
+        trickplayImage = m.trickplayImages[i]
+        status = LCase(trickplayImage.loadStatus)
+
+        if status = "ready"
+
+            m.trickplayBufferLoading[i] = false
+
+            tileIndex = m.trickplayBufferTiles[i]
+
+            ' Requested tile is now ready.
+            if tileIndex = m.trickplayTargetTile
+                updateTrickplay(m.top.previewPosition)
+            end if
+
+            ' Keep neighbors prepared.
+            if tileIndex = m.trickplayCurrentTile
+                prepareTrickplayNeighbors(tileIndex)
+            end if
+
+        else if status = "failed"
+
+            m.trickplayBufferLoading[i] = false
+
+            if i <> m.trickplayActiveBuffer
+                m.trickplayBufferTiles[i] = -1
+                trickplayImage.uri = ""
+            end if
+
+        end if
+    end for
+end sub
+
+
+' ============================================================
+' SEEKING
+' ============================================================
+
+sub onTrickplaySeekingChanged()
+    if m.top.isSeeking
+
+        if isValidAndNotEmpty(m.trickplayDataFinal)
+            updateTrickplay(m.top.previewPosition)
+
+            if m.trickplayActiveBuffer >= 0
+                m.trickplayImages[m.trickplayActiveBuffer].visible = true
+            end if
+        end if
+
+    else
+
+        if m.trickplayActiveBuffer >= 0
+            m.trickplayImages[m.trickplayActiveBuffer].visible = false
+        end if
+
+    end if
+end sub
+
+
+sub onTrickplayPreviewPositionChanged()
+
+    if not m.top.isSeeking
         return
     end if
 
-    ' ------------------------------------------------------------
-    ' CASE 3: genuinely new mosaic, not cached anywhere.
-    '
-    ' This is the only case that requires decoding a brand-new
-    ' texture, so it is the only case that gets throttled: the first
-    ' crossing fires immediately, further crossings while the timer
-    ' is armed just update m.requested* and wait for the next tick.
-    ' ------------------------------------------------------------
-
-    if not m.throttleActive
-        startLoadingRequestedTile()
-    end if
-end sub
-
-
-' Loads the current m.requested* target into the loading buffer and
-' arms the throttle window. Called both for the immediate (first
-' crossing) case and from the throttle timer for subsequent crossings.
-sub startLoadingRequestedTile()
-    tileIndex = m.requestedTileIndex
-    tileUri = m.requestedTileUri
-
-    ' NEVER change the active URI.
-    ' Only the inactive (loading) buffer receives the new URI.
-    m.loadingTileIndex = tileIndex
-    m.loadingTileUri = tileUri
-
-    m.loadingImage.visible = false
-
-    configureImage(
-        m.loadingImage,
-        m.requestedMosaicWidth,
-        m.requestedMosaicHeight,
-        m.requestedTranslation,
-        m.requestedClippingRect,
-        m.requestedLoadWidth,
-        m.requestedLoadHeight
-    )
-
-    m.throttleActive = true
-    m.throttleTimer.control = "start"
-
-    if m.loadingImage.uri <> tileUri
-        m.loadingImage.uri = tileUri
-    else if m.loadingImage.loadStatus = "ready"
-        onLoadingImageReady()
-    end if
-end sub
-
-
-' A buffer already holds the exact decoded texture we need (the user
-' scrubbed back into a mosaic seen earlier). Adopt it as the loading
-' buffer and let the normal ready-check swap it in immediately.
-sub promoteReadyBuffer(image as object, isA as boolean, tileIndex as integer, tileUri as string, mosaicWidth as float, mosaicHeight as float, translation as object, clippingRect as object, loadWidth as float, loadHeight as float)
-    m.loadingImage = image
-    m.loadingIsA = isA
-
-    configureImage(image, mosaicWidth, mosaicHeight, translation, clippingRect, loadWidth, loadHeight)
-
-    m.loadingTileIndex = tileIndex
-    m.loadingTileUri = tileUri
-
-    onLoadingImageReady()
-end sub
-
-
-sub configureImage(image as object, mosaicWidth as float, mosaicHeight as float, translation as object, clippingRect as object, loadWidth as float, loadHeight as float)
-    if not isValid(image) then return
-
-    ' Decode dimensions.
-    image.loadWidth = loadWidth
-    image.loadHeight = loadHeight
-
-    ' Display dimensions.
-    image.width = mosaicWidth
-    image.height = mosaicHeight
-
-    image.translation = translation
-    image.clippingRect = clippingRect
-end sub
-
-
-sub onImageALoadStatus(event as object)
-    if not isValid(event) then return
-
-    if event.getData() <> "ready" then return
-
-    if not m.loadingIsA then return
-
-    onLoadingImageReady()
-end sub
-
-
-sub onImageBLoadStatus(event as object)
-    if not isValid(event) then return
-
-    if event.getData() <> "ready" then return
-
-    if m.loadingIsA then return
-
-    onLoadingImageReady()
-end sub
-
-
-sub onLoadingImageReady()
-    if not isValid(m.loadingImage) then return
-
-    if m.loadingTileIndex < 0 then return
-
-    ' User moved again while the image was loading.
-    if m.loadingTileIndex <> m.requestedTileIndex
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
         return
     end if
 
-    if m.loadingTileUri <> m.requestedTileUri
-        return
-    end if
-
-    if m.loadingImage.loadStatus <> "ready"
-        return
-    end if
-
-    swapImages()
-end sub
-
-
-sub swapImages()
-    if m.loadingTileIndex < 0 then return
-
-    ' Keep the original swap behavior because this is the version
-    ' that produced the least noticeable transition.
-    m.loadingImage.visible = true
-    m.activeImage.visible = false
-
-    oldActiveImage = m.activeImage
-
-    m.activeImage = m.loadingImage
-    m.loadingImage = oldActiveImage
-
-    m.loadingIsA = not m.loadingIsA
-
-    m.activeTileIndex = m.loadingTileIndex
-    m.activeTileUri = m.loadingTileUri
-
-    m.loadingTileIndex = -1
-    m.loadingTileUri = ""
-
-    m.requestedTileIndex = m.activeTileIndex
-    m.requestedTileUri = m.activeTileUri
-end sub
-
-
-' Fires roughly every TRICKPLAY_LOAD_THROTTLE_SECONDS while the user
-' keeps crossing into new mosaics faster than they can load.
-sub onThrottleTimerFire(event as object)
-    ' Caught up: the most recent requested position is already active
-    ' or already loading, nothing new to fetch. Release the throttle so
-    ' the next real crossing fires immediately again.
-    if m.requestedTileIndex = m.activeTileIndex or m.requestedTileIndex = m.loadingTileIndex
-        m.throttleActive = false
-        return
-    end if
-
-    ' Still behind: load the most recent pending mosaic and keep the
-    ' cadence capped by re-arming the timer.
-    startLoadingRequestedTile()
-end sub
-
-
-sub hide()
-    m.trickplayImageA.visible = false
-    m.trickplayImageB.visible = false
-    m.trickplayBackground.visible = false
-
-    m.throttleActive = false
-    m.throttleTimer.control = "stop"
+    updateTrickplay(m.top.previewPosition)
 end sub

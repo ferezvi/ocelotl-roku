@@ -8,57 +8,33 @@ import "pkg:/source/utils/misc.bs"
 const SEEK_SECONDS = 10
 const SKIP_SECONDS = 30
 
-' ------------------------------------------------------------
-' Lifecycle
-' ------------------------------------------------------------
+
+' ============================================================
+' LIFECYCLE
+' ============================================================
 
 sub init()
     m.top.enableUI = false
 
+    ' Player UI.
     m.playerOSD = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
     m.progressBar = m.playerOSD.findNode("progressBar")
     m.topOSD = m.playerOSD.findNode("topOSD")
 
-    ' Trickplay uses three image buffers:
-    '
-    '   buffer 0 = tile
-    '   buffer 1 = tile
-    '   buffer 2 = tile
-    '
-    ' Only one buffer is visible at a time. A new tile is loaded into
-    ' a hidden buffer and is only made visible after loadStatus = ready.
-    m.trickplayImages = [
-        m.top.findNode("trickplayImage0"),
-        m.top.findNode("trickplayImage1"),
-        m.top.findNode("trickplayImage2")
-    ]
-
-    m.trickplayActiveBuffer = -1
-
-    m.trickplayBufferTiles = [-1, -1, -1]
-    m.trickplayBufferLoading = [false, false, false]
-
-    m.trickplayCurrentTile = -1
-    m.trickplayCurrentThumbnail = -1
-    m.trickplayTargetTile = -1
-    m.trickplayTargetThumbnail = -1
-
-    for each trickplayImage in m.trickplayImages
-        trickplayImage.visible = false
-        trickplayImage.observeField("loadStatus", "onTrickplayImageLoadStatusChanged")
-    end for
-
+    ' Trickplay is now fully encapsulated in its own component.
+    m.trickplay = m.top.findNode("trickplay")
     m.progressBar.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
     m.progressBar.observeField("isSeeking", "onTrickplaySeekingChanged")
 
-    m.iconInterval = 0
 
+    ' Player OSD events.
     m.playerOSD.observeField("trackSelected", "onTrackSelected")
     m.playerOSD.observeField("action", "onOSDAction")
     m.playerOSD.observeField("visible", "onOSDVisibilityChanged")
 
+    ' Video events.
     m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
     m.top.observeField("state", "onStateChanged")
     m.top.observeField("position", "onVideoPositionChanged")
@@ -68,12 +44,20 @@ sub init()
 
     stopLoadingSpinner()
 
+    ' Current queue item.
     currentItem = m.global.queueManager.callFunc("getCurrentItem")
     m.top.id = currentItem.id
 
+    ' Preferred subtitle.
     preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+
     m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NOTSET
+
     m.firstContentLoad = true
+
+    ' --------------------------------------------------------
+    ' Load video metadata/content.
+    ' --------------------------------------------------------
 
     m.loadContentTask = CreateObject("roSGNode", "LoadVideoContentTask")
     m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
@@ -83,364 +67,44 @@ sub init()
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 
+    ' --------------------------------------------------------
+    ' Trickplay image cache.
+    ' --------------------------------------------------------
+
     m.preloadTrickplayImagesTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
     m.preloadTrickplayImagesTask.videoID = currentItem.id
     m.top.appendChild(m.preloadTrickplayImagesTask)
+
+    ' --------------------------------------------------------
+    ' Playback reporting.
+    ' --------------------------------------------------------
 
     m.playbackTimer = m.top.findNode("playbackTimer")
     m.playbackTimer.observeField("fire", "ReportPlayback")
     m.playReported = false
 
     centerSpinnerPercentLabel()
+
     m.top.setFocus(true)
 end sub
 
-' ------------------------------------------------------------
-' Trickplay
-' ------------------------------------------------------------
-
-sub resetTrickplayBuffers()
-    for i = 0 to 2
-        m.trickplayImages[i].visible = false
-        m.trickplayImages[i].uri = ""
-        m.trickplayBufferTiles[i] = -1
-        m.trickplayBufferLoading[i] = false
-    end for
-
-    m.trickplayActiveBuffer = -1
-    m.trickplayCurrentTile = -1
-    m.trickplayCurrentThumbnail = -1
-    m.trickplayTargetTile = -1
-    m.trickplayTargetThumbnail = -1
+sub onTrickplayPreviewPositionChanged()
+    m.trickplay.previewPosition = m.progressBar.previewPosition
 end sub
 
-function getTrickplayBufferForTile(tileIndex as integer) as integer
-    for i = 0 to 2
-        if m.trickplayBufferTiles[i] = tileIndex and not m.trickplayBufferLoading[i]
-            return i
-        end if
-    end for
-
-    return -1
-end function
-
-function getTrickplayBufferLoadingTile(tileIndex as integer) as integer
-    for i = 0 to 2
-        if m.trickplayBufferTiles[i] = tileIndex and m.trickplayBufferLoading[i]
-            return i
-        end if
-    end for
-
-    return -1
-end function
-
-function getTrickplayFreeBuffer() as integer
-    ' Prefer an unused buffer.
-    for i = 0 to 2
-        if m.trickplayBufferTiles[i] < 0 and not m.trickplayBufferLoading[i]
-            return i
-        end if
-    end for
-
-    ' Never replace the active buffer.
-    for i = 0 to 2
-        if i <> m.trickplayActiveBuffer and not m.trickplayBufferLoading[i]
-            return i
-        end if
-    end for
-
-    return -1
-end function
-
-sub configureTrickplayImage(bufferIndex as integer, tileIndex as integer)
-    if not isValidAndNotEmpty(m.trickplayDataFinal) then return
-    if bufferIndex < 0 or bufferIndex > 2 then return
-    if tileIndex < 0 then return
-
-    data = m.trickplayDataFinal
-
-    trickplayImage = m.trickplayImages[bufferIndex]
-
-    trickplayImage.width = data.Width * data.TileWidth
-    trickplayImage.height = data.Height * data.TileHeight
-
-    trickplayImage.visible = false
-end sub
-
-sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
-    if not isValidAndNotEmpty(m.trickplayDataFinal) then return
-    if bufferIndex < 0 or bufferIndex > 2 then return
-    if tileIndex < 0 then return
-
-    data = m.trickplayDataFinal
-
-    if tileIndex >= data.TileHeight * data.TileWidth * 1000000
-        return
-    end if
-
-    trickplayImage = m.trickplayImages[bufferIndex]
-
-    ' The buffer must remain hidden while Roku loads the JPEG.
-    trickplayImage.visible = false
-
-    m.trickplayBufferTiles[bufferIndex] = tileIndex
-    m.trickplayBufferLoading[bufferIndex] = true
-
-    trickplayImage.width = data.Width * data.TileWidth
-    trickplayImage.height = data.Height * data.TileHeight
-
-    trickplayImage.uri = `tmp:/${m.top.id}-${tileIndex}.jpg`
-end sub
-
-sub prepareTrickplayNeighbors(tileIndex as integer)
-    if not isValidAndNotEmpty(m.trickplayDataFinal) then return
-
-    data = m.trickplayDataFinal
-    thumbnailsPerTile = data.TileHeight * data.TileWidth
-
-    if thumbnailsPerTile <= 0 then return
-
-    maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
-
-    ' Prepare previous tile.
-    previousTile = tileIndex - 1
-
-    if previousTile >= 0
-        if getTrickplayBufferForTile(previousTile) < 0 and getTrickplayBufferLoadingTile(previousTile) < 0
-            bufferIndex = getTrickplayFreeBuffer()
-
-            if bufferIndex >= 0
-                loadTrickplayTile(previousTile, bufferIndex)
-            end if
-        end if
-    end if
-
-    ' Prepare next tile.
-    nextTile = tileIndex + 1
-
-    if nextTile <= maxTileIndex
-        if getTrickplayBufferForTile(nextTile) < 0 and getTrickplayBufferLoadingTile(nextTile) < 0
-            bufferIndex = getTrickplayFreeBuffer()
-
-            if bufferIndex >= 0
-                loadTrickplayTile(nextTile, bufferIndex)
-            end if
-        end if
-    end if
-end sub
-
-sub showTrickplayBuffer(bufferIndex as integer, tileIndex as integer)
-    if bufferIndex < 0 or bufferIndex > 2 then return
-
-    if m.trickplayBufferTiles[bufferIndex] <> tileIndex
-        return
-    end if
-
-    ' Never hide the current image before the new image is ready.
-    oldBuffer = m.trickplayActiveBuffer
-
-    m.trickplayImages[bufferIndex].visible = true
-    m.trickplayActiveBuffer = bufferIndex
-
-    if oldBuffer >= 0 and oldBuffer <> bufferIndex
-        m.trickplayImages[oldBuffer].visible = false
-    end if
-
-    m.trickplayCurrentTile = tileIndex
-end sub
-
-sub updateTrickplay(trickPosition as float)
-    if not isValidAndNotEmpty(m.trickplayDataFinal) then return
-    if m.iconInterval <= 0 then return
-    if m.top.duration <= 0 then return
-
-    data = m.trickplayDataFinal
-
-    ' Clamp position.
-    if trickPosition < 0
-        trickPosition = 0
-    else if trickPosition > m.top.duration
-        trickPosition = m.top.duration
-    end if
-
-    ' Thumbnail corresponding to this position.
-    iconIndex = fix(trickPosition / m.iconInterval)
-
-    if iconIndex >= data.ThumbnailCount
-        iconIndex = data.ThumbnailCount - 1
-    end if
-
-    if iconIndex < 0
-        iconIndex = 0
-    end if
-
-    thumbnailsPerTile = data.TileHeight * data.TileWidth
-
-    if thumbnailsPerTile <= 0 then return
-
-    tileIndex = fix(iconIndex / thumbnailsPerTile)
-
-    tileIconIndex = iconIndex - (tileIndex * thumbnailsPerTile)
-
-    iconRow = fix(tileIconIndex / data.TileWidth)
-    iconColumn = tileIconIndex mod data.TileWidth
-
-    m.trickplayTargetTile = tileIndex
-    m.trickplayTargetThumbnail = iconIndex
-
-    ' --------------------------------------------------------
-    ' Find the tile in one of the three buffers.
-    ' --------------------------------------------------------
-
-    bufferIndex = getTrickplayBufferForTile(tileIndex)
-
-    if bufferIndex < 0
-        ' Tile may already be loading.
-        loadingBuffer = getTrickplayBufferLoadingTile(tileIndex)
-
-        if loadingBuffer >= 0
-            ' Keep the previous image visible while the requested tile loads.
-            return
-        end if
-
-        ' Load the requested tile into a hidden buffer.
-        bufferIndex = getTrickplayFreeBuffer()
-
-        if bufferIndex < 0
-            ' All buffers are currently busy.
-            return
-        end if
-
-        loadTrickplayTile(tileIndex, bufferIndex)
-        return
-    end if
-
-    ' --------------------------------------------------------
-    ' Calculate preview position.
-    ' --------------------------------------------------------
-
-    previewPosPercentage = 0
-
-    if m.top.duration > 0
-        previewPosPercentage = trickPosition / m.top.duration
-    end if
-
-    if previewPosPercentage < 0
-        previewPosPercentage = 0
-    else if previewPosPercentage > 1
-        previewPosPercentage = 1
-    end if
-
-    trackWidth = m.progressBar.trackWidth
-
-    progressX = m.playerOSD.translation[0] + m.progressBar.translation[0] + (trackWidth * previewPosPercentage)
-    progressY = m.playerOSD.translation[1] + m.progressBar.translation[1]
-
-    offsetHoriz = progressX - (data.Width / 2)
-    offsetVert = progressY - 25 - data.Height
-
-    ' Keep preview inside the screen.
-    if offsetHoriz < 0
-        offsetHoriz = 0
-    end if
-
-    if offsetHoriz + data.Width > 1920
-        offsetHoriz = 1920 - data.Width
-    end if
-
-    trickplayImage = m.trickplayImages[bufferIndex]
-
-    ' Tileset dimensions.
-    trickplayImage.width = data.Width * data.TileWidth
-    trickplayImage.height = data.Height * data.TileHeight
-
-    ' Move the entire tileset while clipping the desired thumbnail.
-    trickplayImage.translation = [
-        offsetHoriz - (iconColumn * data.Width),
-        offsetVert - (iconRow * data.Height)
-    ]
-
-    trickplayImage.clippingRect = [
-        iconColumn * data.Width,
-        iconRow * data.Height,
-        data.Width,
-        data.Height
-    ]
-
-    ' Switch to the requested buffer.
-    if m.trickplayActiveBuffer <> bufferIndex
-        showTrickplayBuffer(bufferIndex, tileIndex)
-    else
-        trickplayImage.visible = true
-    end if
-
-    m.trickplayCurrentTile = tileIndex
-    m.trickplayCurrentThumbnail = iconIndex
-
-    ' Start loading the tiles immediately around the current one.
-    prepareTrickplayNeighbors(tileIndex)
-end sub
-
-sub onTrickplayImageLoadStatusChanged()
-    for i = 0 to 2
-        trickplayImage = m.trickplayImages[i]
-        status = LCase(trickplayImage.loadStatus)
-
-        if status = "ready"
-            m.trickplayBufferLoading[i] = false
-
-            tileIndex = m.trickplayBufferTiles[i]
-
-            ' If this is the tile currently requested by the seek,
-            ' render it now. The previous buffer remained visible
-            ' during loading, so there is no blank frame.
-            if tileIndex = m.trickplayTargetTile
-                updateTrickplay(m.progressBar.previewPosition)
-            end if
-
-            ' Keep neighboring tiles prepared.
-            if tileIndex = m.trickplayCurrentTile
-                prepareTrickplayNeighbors(tileIndex)
-            end if
-
-        else if status = "failed"
-            m.trickplayBufferLoading[i] = false
-
-            ' Do not clear the active buffer.
-            if i <> m.trickplayActiveBuffer
-                m.trickplayBufferTiles[i] = -1
-                trickplayImage.uri = ""
-            end if
-        end if
-    end for
-end sub
 
 sub onTrickplaySeekingChanged()
-    if m.progressBar.isSeeking
-        if isValidAndNotEmpty(m.trickplayDataFinal)
-            updateTrickplay(m.progressBar.previewPosition)
+    m.trickplay.isSeeking = m.progressBar.isSeeking
 
-            if m.trickplayActiveBuffer >= 0
-                m.trickplayImages[m.trickplayActiveBuffer].visible = true
-            end if
-        end if
-    else
-        if m.trickplayActiveBuffer >= 0
-            m.trickplayImages[m.trickplayActiveBuffer].visible = false
-        end if
+    if m.progressBar.isSeeking
+        m.trickplay.previewPosition = m.progressBar.previewPosition
     end if
 end sub
 
-sub onTrickplayPreviewPositionChanged()
-    if not m.progressBar.isSeeking then return
-    if not isValidAndNotEmpty(m.trickplayDataFinal) then return
 
-    updateTrickplay(m.progressBar.previewPosition)
-end sub
-
-' ------------------------------------------------------------
-' Video content
-' ------------------------------------------------------------
+' ============================================================
+' VIDEO CONTENT
+' ============================================================
 
 sub onVideoContentLoaded()
     stopLoadingSpinner()
@@ -458,40 +122,58 @@ sub onVideoContentLoaded()
 
     item = videoContent[0]
 
-    m.trickplay = item.trickplay
+    ' --------------------------------------------------------
+    ' Trickplay
+    ' --------------------------------------------------------
 
-    m.trickplayDataFinal = invalid
+    m.trickplay.videoId = item.id
+    m.trickplay.trickplay = item.trickplay
 
-    if isValidAndNotEmpty(m.trickplay)
-        trickplayData = m.trickplay.LookupCI(m.top.id)
+    ' --------------------------------------------------------
+    ' Remove previous video's cached trickplay tiles.
+    ' --------------------------------------------------------
 
-        if isValidAndNotEmpty(trickplayData)
-            m.trickplayDataFinal = trickplayData.lookupCI(trickplayData.keys()[0])
-
-            if isValidAndNotEmpty(m.trickplayDataFinal)
-                m.iconInterval = m.trickplayDataFinal.Interval / 1000
-
-                resetTrickplayBuffers()
-            end if
-        end if
-    end if
-
-    ' Remove the previous video's tiles before loading the new ones.
     if isValid(m.currentTrickplayVideoId) and m.currentTrickplayVideoId <> ""
         m.preloadTrickplayImagesTask.videoID = m.currentTrickplayVideoId
         m.preloadTrickplayImagesTask.method = "REMOVE"
         m.preloadTrickplayImagesTask.control = TaskControl.RUN
     end if
 
-    if isValidAndNotEmpty(m.trickplayDataFinal)
-        m.preloadTrickplayImagesTask.videoID = item.id
-        m.preloadTrickplayImagesTask.numImagesToLoad = fix((m.trickplayDataFinal.ThumbnailCount - 1) / (m.trickplayDataFinal.TileHeight * m.trickplayDataFinal.TileWidth))
-        m.preloadTrickplayImagesTask.trickplayWidth = m.trickplayDataFinal.Width
-        m.preloadTrickplayImagesTask.method = "ADD"
-        m.preloadTrickplayImagesTask.control = TaskControl.RUN
+    ' --------------------------------------------------------
+    ' Cache current video's trickplay tiles.
+    ' --------------------------------------------------------
+
+    trickplayDataFinal = invalid
+
+    if isValidAndNotEmpty(item.trickplay)
+        trickplayData = item.trickplay.LookupCI(item.id)
+
+        if isValidAndNotEmpty(trickplayData)
+            keys = trickplayData.keys()
+
+            if keys.count() > 0
+                trickplayDataFinal = trickplayData.lookupCI(keys[0])
+            end if
+        end if
+    end if
+
+    if isValidAndNotEmpty(trickplayDataFinal)
+        thumbnailsPerTile = trickplayDataFinal.TileHeight * trickplayDataFinal.TileWidth
+
+        if thumbnailsPerTile > 0
+            m.preloadTrickplayImagesTask.videoID = item.id
+            m.preloadTrickplayImagesTask.numImagesToLoad = fix((trickplayDataFinal.ThumbnailCount - 1) / thumbnailsPerTile)
+            m.preloadTrickplayImagesTask.trickplayWidth = trickplayDataFinal.Width
+            m.preloadTrickplayImagesTask.method = "ADD"
+            m.preloadTrickplayImagesTask.control = TaskControl.RUN
+        end if
     end if
 
     m.currentTrickplayVideoId = item.id
+
+    ' --------------------------------------------------------
+    ' Video playback fields.
+    ' --------------------------------------------------------
 
     m.top.PlaySessionId = item.PlaySessionId
     m.top.videoId = item.id
@@ -506,7 +188,7 @@ sub onVideoContentLoaded()
     m.playerOSD.videoId = item.id
     m.top.content = item.content
 
-    ' Falls back to track 0 if audioIndex is somehow invalid on this load.
+    ' Falls back to track 0 if audioIndex is invalid.
     if isValid(item.audioIndex)
         m.top.audioTrack = item.audioIndex.toStr()
     else
@@ -515,7 +197,12 @@ sub onVideoContentLoaded()
 
     m.top.allowCaptions = not (isValid(item.subtitlesBurnedIn) and item.subtitlesBurnedIn)
 
+    ' --------------------------------------------------------
+    ' Subtitle/audio information.
+    ' --------------------------------------------------------
+
     applySubtitleContent(item)
+
     m.playerOSD.fullAudioData = item.fullAudioData
     m.playerOSD.fullSubtitleData = item.fullSubtitleData
     m.playerOSD.audioIndex = item.audioIndex
@@ -523,8 +210,12 @@ sub onVideoContentLoaded()
     m.playerOSD.itemId = item.id
     m.playerOSD.overview = item.overview
 
+    ' --------------------------------------------------------
+    ' OSD metadata.
+    ' --------------------------------------------------------
+
     if item.content.live
-        ' return
+        ' Live content uses the same player flow.
     end if
 
     m.topOSD.itemTitleText = item.content.title
@@ -543,25 +234,36 @@ sub onVideoContentLoaded()
 
     m.topOSD.logoImage = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
 
+    ' --------------------------------------------------------
+    ' Initial audio selection.
+    ' --------------------------------------------------------
+
     if m.firstContentLoad
         m.top.selectedAudioIndex = item.audioIndex
         m.firstContentLoad = false
     end if
 
+    ' Start playback.
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)
 end sub
 
-' ------------------------------------------------------------
-' Playback state
-' ------------------------------------------------------------
+
+' ============================================================
+' PLAYBACK STATE
+' ============================================================
 
 sub onStateChanged()
     m.playerOSD.playbackState = m.top.state
 
+    ' Keep custom captions synchronized with playback.
     if isValid(m.captionTask)
         m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
     end if
+
+    ' --------------------------------------------------------
+    ' Buffering spinner.
+    ' --------------------------------------------------------
 
     if m.top.state = MediaPlaybackState.BUFFERING
         m.playerSpinner.visible = true
@@ -570,6 +272,10 @@ sub onStateChanged()
         m.playerSpinner.visible = false
         m.spinnerPercentLabel.visible = false
     end if
+
+    ' --------------------------------------------------------
+    ' Playback reporting.
+    ' --------------------------------------------------------
 
     if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
         if not m.playReported
@@ -600,12 +306,15 @@ sub onStateChanged()
     end if
 end sub
 
-' ------------------------------------------------------------
-' Playback reporting
-' ------------------------------------------------------------
+
+' ============================================================
+' PLAYBACK REPORTING
+' ============================================================
 
 sub ReportPlayback(state = "update" as string)
-    if m.top.position = invalid then return
+    if m.top.position = invalid
+        return
+    end if
 
     params = {
         "ItemId": m.top.id,
@@ -616,7 +325,9 @@ sub ReportPlayback(state = "update" as string)
 
     playstateTask = m.global.playstateTask
 
-    if not isValid(playstateTask) then return
+    if not isValid(playstateTask)
+        return
+    end if
 
     playstateTask.setFields({
         status: state,
@@ -626,12 +337,15 @@ sub ReportPlayback(state = "update" as string)
     playstateTask.control = TaskControl.RUN
 end sub
 
-' ------------------------------------------------------------
-' Buffering
-' ------------------------------------------------------------
+
+' ============================================================
+' BUFFERING
+' ============================================================
 
 sub onBufferingStatusChanged()
-    if m.top.state <> MediaPlaybackState.BUFFERING then return
+    if m.top.state <> MediaPlaybackState.BUFFERING
+        return
+    end if
 
     if isValid(m.top.bufferingStatus)
         percentage = m.top.bufferingStatus["percentage"]
@@ -644,9 +358,10 @@ sub onBufferingStatusChanged()
     end if
 end sub
 
-' ------------------------------------------------------------
-' Position
-' ------------------------------------------------------------
+
+' ============================================================
+' VIDEO POSITION
+' ============================================================
 
 sub onVideoPositionChanged()
     progressBar = m.playerOSD.findNode("progressBar")
@@ -654,6 +369,8 @@ sub onVideoPositionChanged()
     if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
         progressBar.position = m.top.position
         progressBar.duration = m.top.duration
+
+        m.trickplay.duration = m.top.duration
     end if
 
     if isValid(m.captionTask)
@@ -661,12 +378,14 @@ sub onVideoPositionChanged()
     end if
 end sub
 
-' ------------------------------------------------------------
-' Audio track selection
-' ------------------------------------------------------------
+' ============================================================
+' AUDIO TRACK SELECTION
+' ============================================================
 
 sub onAvailableAudioTracksChanged()
-    if not isValidAndNotEmpty(m.top.availableAudioTracks) then return
+    if not isValidAndNotEmpty(m.top.availableAudioTracks)
+        return
+    end if
 
     preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
 
@@ -680,26 +399,33 @@ sub onAvailableAudioTracksChanged()
             m.global.queueManager.callFunc("setPreferredAudioTrackIndex", rokuTrackIndex)
             m.top.audioIndex = rokuTrackIndex
 
-            if m.top.currentAudioTrack = rokuTrackString then return
+            if m.top.currentAudioTrack = rokuTrackString
+                return
+            end if
 
             if m.top.position <> 0
                 m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
             end if
 
             m.top.control = VideoControl.STOP
+
             m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
             m.loadContentTask.itemId = m.top.id
             m.loadContentTask.observeField("content", "onVideoContentLoaded")
             m.loadContentTask.control = TaskControl.RUN
+
             exit for
         end if
     end for
 end sub
 
+
 sub onTrackSelected()
     selection = m.playerOSD.trackSelected
 
-    if not isValid(selection) then return
+    if not isValid(selection)
+        return
+    end if
 
     if selection.kind = "audio"
         switchAudioTrack(selection.index, selection.jellyfinIndex)
@@ -711,10 +437,13 @@ sub onTrackSelected()
     end if
 end sub
 
+
 sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
     m.top.selectedAudioIndex = jellyfinIndex
 
-    if desiredIndex = m.top.audioIndex then return
+    if desiredIndex = m.top.audioIndex
+        return
+    end if
 
     if m.top.position <> 0
         m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
@@ -728,9 +457,10 @@ sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
     m.loadContentTask.control = TaskControl.RUN
 end sub
 
-' ------------------------------------------------------------
-' Subtitle track selection
-' ------------------------------------------------------------
+
+' ============================================================
+' SUBTITLE TRACK SELECTION
+' ============================================================
 
 sub applySubtitleContent(item as object)
     m.top.unobserveField("SelectedSubtitle")
@@ -745,6 +475,7 @@ sub applySubtitleContent(item as object)
 
     m.top.observeField("SelectedSubtitle", "onSubtitleChange")
 end sub
+
 
 function applySubtitleTrackFields(subtitleIndex as dynamic, subtitleData as object) as boolean
     selectedSubtitle = invalid
@@ -775,53 +506,6 @@ function applySubtitleTrackFields(subtitleIndex as dynamic, subtitleData as obje
     return selectedSubtitle.IsEncoded
 end function
 
-' ------------------------------------------------------------
-' Captions
-' ------------------------------------------------------------
-
-sub onAllowCaptionsChange()
-    if not m.top.allowCaptions then return
-
-    m.captionGroup = m.top.findNode("captionGroup")
-    m.captionGroup.createchildren(9, "LayoutGroup")
-
-    m.captionTask = createObject("roSGNode", "captionTask")
-    m.captionTask.observeField("currentCaption", "updateCaption")
-
-    m.top.observeField("subtitleTrack", "loadCaption")
-    m.top.observeField("globalCaptionMode", "toggleCaption")
-
-    customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
-
-    if customSubsEnabled
-        m.top.suppressCaptions = true
-        toggleCaption()
-    else
-        m.top.suppressCaptions = false
-    end if
-end sub
-
-sub loadCaption()
-    if m.top.suppressCaptions
-        m.captionTask.url = m.top.subtitleTrack
-    end if
-end sub
-
-sub toggleCaption()
-    m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
-
-    if LCase(m.top.globalCaptionMode) = "on"
-        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode + "w"
-        m.captionGroup.visible = true
-    else
-        m.captionGroup.visible = false
-    end if
-end sub
-
-sub updateCaption()
-    m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
-    m.captionGroup.appendChildren(m.captionTask.currentCaption)
-end sub
 
 sub onSubtitleChange()
     switchWithoutRefresh = true
@@ -846,11 +530,13 @@ sub onSubtitleChange()
     end if
 
     m.top.control = VideoControl.STOP
+
     m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
     m.loadContentTask.itemId = m.top.id
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 end sub
+
 
 function availSubtitleTrackIdx(trackNameToFind as string) as integer
     idx = 0
@@ -866,19 +552,78 @@ function availSubtitleTrackIdx(trackNameToFind as string) as integer
     return SubtitleSelection.NONE
 end function
 
-' ------------------------------------------------------------
-' OSD / input handling
-' ------------------------------------------------------------
+
+' ============================================================
+' CAPTIONS
+' ============================================================
+
+sub onAllowCaptionsChange()
+    if not m.top.allowCaptions
+        return
+    end if
+
+    m.captionGroup = m.top.findNode("captionGroup")
+    m.captionGroup.createchildren(9, "LayoutGroup")
+
+    m.captionTask = createObject("roSGNode", "captionTask")
+    m.captionTask.observeField("currentCaption", "updateCaption")
+
+    m.top.observeField("subtitleTrack", "loadCaption")
+    m.top.observeField("globalCaptionMode", "toggleCaption")
+
+    customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
+
+    if customSubsEnabled
+        m.top.suppressCaptions = true
+        toggleCaption()
+    else
+        m.top.suppressCaptions = false
+    end if
+end sub
+
+
+sub loadCaption()
+    if m.top.suppressCaptions
+        m.captionTask.url = m.top.subtitleTrack
+    end if
+end sub
+
+
+sub toggleCaption()
+    m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
+
+    if LCase(m.top.globalCaptionMode) = "on"
+        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode + "w"
+        m.captionGroup.visible = true
+    else
+        m.captionGroup.visible = false
+    end if
+end sub
+
+
+sub updateCaption()
+    m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
+    m.captionGroup.appendChildren(m.captionTask.currentCaption)
+end sub
+
+
+' ============================================================
+' OSD / INPUT
+' ============================================================
 
 function onKeyEvent(key as string, press as boolean) as boolean
-    if not press then return false
+    if not press
+        return false
+    end if
 
     if isStringEqual(key, KeyCode.PLAY)
         handlePlayKey()
         return true
     end if
 
-    if m.playerOSD.visible then return false
+    if m.playerOSD.visible
+        return false
+    end if
 
     if isStringEqual(key, KeyCode.OK)
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
@@ -887,16 +632,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
+
         return true
 
     else if isStringEqual(key, KeyCode.UP)
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusOptionControls")
+
         return true
 
     else if isStringEqual(key, KeyCode.DOWN)
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
+
         return true
 
     else if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.FASTFORWRD) or isStringEqual(key, KeyCode.REWIND)
@@ -906,16 +654,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
         direction = (isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)) ? 1 : -1
 
         m.progressBar.callFunc("seekStep", direction)
+
         return true
 
     else if isStringEqual(key, KeyCode.BACK)
         m.top.control = VideoControl.STOP
         m.global.sceneManager.callFunc("popScene")
+
         return true
     end if
 
     return false
 end function
+
 
 sub handlePlayKey()
     if not m.playerOSD.visible
@@ -925,6 +676,7 @@ sub handlePlayKey()
 
         m.playerOSD.visible = true
         m.playerOSD.callFunc("focusControls")
+
     else
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
             m.top.control = VideoControl.PAUSE
@@ -935,10 +687,12 @@ sub handlePlayKey()
     end if
 end sub
 
+
 sub onOSDAction(event as object)
     action = event.getData()
 
     if action = "playPauseButton"
+
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
             m.top.control = VideoControl.PAUSE
         else
@@ -973,11 +727,13 @@ sub onOSDAction(event as object)
     end if
 end sub
 
+
 sub onOSDVisibilityChanged()
     if not m.playerOSD.visible
         m.top.setFocus(true)
     end if
 end sub
+
 
 sub hideOSD()
     m.playerOSD.setFocus(false)
@@ -985,9 +741,10 @@ sub hideOSD()
     m.playerOSD.visible = false
 end sub
 
-' ------------------------------------------------------------
-' Focus helpers
-' ------------------------------------------------------------
+
+' ============================================================
+' HELPERS
+' ============================================================
 
 sub centerSpinnerPercentLabel()
     spinnerWidth = m.playerSpinner.poster.bitmapWidth
@@ -999,25 +756,11 @@ sub centerSpinnerPercentLabel()
     ]
 end sub
 
+
 function max(a as float, b as float) as float
-    if a > b then return a
+    if a > b
+        return a
+    end if
+
     return b
 end function
-
-sub manejarPlay()
-    if not m.playerOSD.visible
-        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
-            m.top.control = VideoControl.PAUSE
-        end if
-
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusControls")
-    else
-        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
-            m.top.control = VideoControl.PAUSE
-
-        else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
-            m.top.control = VideoControl.RESUME
-        end if
-    end if
-end sub
