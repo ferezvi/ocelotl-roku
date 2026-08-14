@@ -5,6 +5,12 @@ import "pkg:/source/utils/misc.bs"
 ' ============================================================
 
 const SCREEN_WIDTH = 1920
+' Limit decoded Trickplay mosaics to the FHD design resolution.
+' Roku automatically scales the SceneGraph UI for HD devices, so this
+' keeps decoded texture memory bounded while preserving maximum useful
+' preview resolution for TV playback.
+const TRICKPLAY_MAX_MOSAIC_WIDTH = 1920
+const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1080
 
 
 ' ============================================================
@@ -227,8 +233,29 @@ sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
     m.trickplayBufferTiles[bufferIndex] = tileIndex
     m.trickplayBufferLoading[bufferIndex] = true
 
-    trickplayImage.width = data.Width * data.TileWidth
-    trickplayImage.height = data.Height * data.TileHeight
+    mosaicWidth = data.Width * data.TileWidth
+    mosaicHeight = data.Height * data.TileHeight
+
+    loadMosaicWidth = mosaicWidth
+    loadMosaicHeight = mosaicHeight
+
+    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
+    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
+
+    if loadCapScaleAlt < loadCapScale
+        loadCapScale = loadCapScaleAlt
+    end if
+
+    if loadCapScale < 1.0
+        loadMosaicWidth = mosaicWidth * loadCapScale
+        loadMosaicHeight = mosaicHeight * loadCapScale
+    end if
+
+    trickplayImage.loadWidth = loadMosaicWidth
+    trickplayImage.loadHeight = loadMosaicHeight
+
+    trickplayImage.width = mosaicWidth
+    trickplayImage.height = mosaicHeight
 
     trickplayImage.uri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
 end sub

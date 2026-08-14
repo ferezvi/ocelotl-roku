@@ -11,9 +11,9 @@
     </interface>
 
     <children>
-        <Poster id="trickplayImage0" visible="false" />
-        <Poster id="trickplayImage1" visible="false" />
-        <Poster id="trickplayImage2" visible="false" />
+        <Poster id="trickplayImage0" visible="false" loadDisplayMode="limitSize" />
+        <Poster id="trickplayImage1" visible="false" loadDisplayMode="limitSize" />
+        <Poster id="trickplayImage2" visible="false" loadDisplayMode="limitSize" />
     </children>
 
 </component>
