@@ -12,12 +12,18 @@ const SCREEN_WIDTH = 1920
 const TRICKPLAY_MAX_MOSAIC_WIDTH = 1920
 const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1080
 
+const TRICKPLAY_BOX_WIDTH = 320
+const TRICKPLAY_BOX_HEIGHT = 180
 
 ' ============================================================
 ' LIFECYCLE
 ' ============================================================
 
 sub init()
+
+    ' Reference to the fixed-size box background used for letterbox/pillarbox bars.
+    m.trickplayBoxBackground = m.top.findNode("trickplayBoxBackground")
+
     m.trickplayDataFinal = invalid
 
     m.trickplayImages = [
@@ -151,6 +157,8 @@ end sub
 ' ============================================================
 
 sub resetTrickplayBuffers()
+    m.trickplayBoxBackground.visible = false
+
     for i = 0 to 2
         m.trickplayImages[i].visible = false
         m.trickplayImages[i].uri = ""
@@ -325,6 +333,7 @@ sub showTrickplayBuffer(bufferIndex as integer, tileIndex as integer)
 
     ' Show the new buffer first.
     m.trickplayImages[bufferIndex].visible = true
+    m.trickplayBoxBackground.visible = true
     m.trickplayActiveBuffer = bufferIndex
 
     ' Hide the previous buffer afterwards.
@@ -438,30 +447,24 @@ sub updateTrickplay(trickPosition as float)
 
     trackWidth = progressBar.trackWidth
 
-    progressX = playerOSD.translation[0] + progressBar.translation[0] + (trackWidth * previewPosPercentage)
-    progressY = playerOSD.translation[1] + progressBar.translation[1]
+    fit = calculateTrickplayBoxFit(data)
 
-    offsetHoriz = progressX - (data.Width / 2)
-    offsetVert = progressY - 25 - data.Height
+    ' Screen position of the box, centered above the progress point.
+    boxX = playerOSD.translation[0] + progressBar.translation[0] + (trackWidth * previewPosPercentage) - (TRICKPLAY_BOX_WIDTH / 2)
+    boxY = playerOSD.translation[1] + progressBar.translation[1] - 25 - TRICKPLAY_BOX_HEIGHT
 
-    ' Keep preview inside the screen.
-    if offsetHoriz < 0
-        offsetHoriz = 0
-    end if
-
-    if offsetHoriz + data.Width > SCREEN_WIDTH
-        offsetHoriz = SCREEN_WIDTH - data.Width
+    ' Keep the box inside the screen.
+    if boxX < 0
+        boxX = 0
+    else if boxX + TRICKPLAY_BOX_WIDTH > SCREEN_WIDTH
+        boxX = SCREEN_WIDTH - TRICKPLAY_BOX_WIDTH
     end if
 
     trickplayImage = m.trickplayImages[bufferIndex]
 
+    ' Unscaled size/clip: still operates in the original mosaic coordinate space.
     trickplayImage.width = data.Width * data.TileWidth
     trickplayImage.height = data.Height * data.TileHeight
-
-    trickplayImage.translation = [
-        offsetHoriz - (iconColumn * data.Width),
-        offsetVert - (iconRow * data.Height)
-    ]
 
     trickplayImage.clippingRect = [
         iconColumn * data.Width,
@@ -469,6 +472,20 @@ sub updateTrickplay(trickPosition as float)
         data.Width,
         data.Height
     ]
+
+    ' Scale applied to the whole node (affects on-screen size, not the clippingRect).
+    trickplayImage.scale = [fit.scale, fit.scale]
+
+    ' Translation: box position plus centering padding, minus the tile's offset within
+    ' the mosaic. The offset must be scaled too, since scale pivots at the node's
+    ' local origin [0,0] and translation is expressed in that same pre-scale space.
+    trickplayImage.translation = [
+        boxX + fit.padX - (iconColumn * data.Width * fit.scale),
+        boxY + fit.padY - (iconRow * data.Height * fit.scale)
+    ]
+
+    ' Position the fixed-size box background at the same screen anchor as the preview.
+    m.trickplayBoxBackground.translation = [boxX, boxY]
 
     ' Switch buffer.
     if m.trickplayActiveBuffer <> bufferIndex
@@ -482,7 +499,6 @@ sub updateTrickplay(trickPosition as float)
 
     prepareTrickplayNeighbors(tileIndex)
 end sub
-
 
 ' ============================================================
 ' IMAGE LOADING
@@ -535,6 +551,7 @@ sub onTrickplaySeekingChanged()
 
             if m.trickplayActiveBuffer >= 0
                 m.trickplayImages[m.trickplayActiveBuffer].visible = true
+                m.trickplayBoxBackground.visible = true
             end if
         end if
 
@@ -542,6 +559,7 @@ sub onTrickplaySeekingChanged()
 
         if m.trickplayActiveBuffer >= 0
             m.trickplayImages[m.trickplayActiveBuffer].visible = false
+            m.trickplayBoxBackground.visible = false
         end if
 
     end if
@@ -560,3 +578,21 @@ sub onTrickplayPreviewPositionChanged()
 
     updateTrickplay(m.top.previewPosition)
 end sub
+
+' Computes "contain" scale and centering padding to fit a tile inside the fixed box.
+function calculateTrickplayBoxFit(data as object) as object
+    scaleX = TRICKPLAY_BOX_WIDTH / data.Width
+    scaleY = TRICKPLAY_BOX_HEIGHT / data.Height
+
+    ' The smaller factor guarantees the tile fits fully without cropping.
+    fitScale = scaleX < scaleY ? scaleX : scaleY
+
+    scaledWidth = data.Width * fitScale
+    scaledHeight = data.Height * fitScale
+
+    return {
+        scale: fitScale,
+        padX: (TRICKPLAY_BOX_WIDTH - scaledWidth) / 2,
+        padY: (TRICKPLAY_BOX_HEIGHT - scaledHeight) / 2
+    }
+end function
