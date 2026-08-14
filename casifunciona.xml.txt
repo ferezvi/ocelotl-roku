@@ -10,7 +10,6 @@
     </interface>
 
     <children>
-        <Timer id="throttleTimer" />
         <Rectangle id="trickplayBackground" color="0xff0000FF" visible="false" />
         <Poster id="trickplayImageA" visible="false" translation="[0, 0]" loadDisplayMode="limitSize" />
         <Poster id="trickplayImageB" visible="false" translation="[0, 0]" loadDisplayMode="limitSize" />

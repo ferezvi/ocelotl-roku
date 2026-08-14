@@ -13,25 +13,14 @@ const TRICKPLAY_BOX_HEIGHT = 180
 const TRICKPLAY_MAX_MOSAIC_WIDTH = 1600
 const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1200
 
-' Minimum time between two consecutive "new mosaic" texture loads while
-' scrubbing continuously. The very first crossing into a new mosaic is
-' NOT throttled (it fires immediately); this only caps the cadence of
-' further reloads if the user keeps scrubbing across more mosaics before
-' the previous one finished loading.
-const TRICKPLAY_LOAD_THROTTLE_SECONDS = 0.200
-
 
 sub init()
     m.trickplayImageA = m.top.findNode("trickplayImageA")
     m.trickplayImageB = m.top.findNode("trickplayImageB")
     m.trickplayBackground = m.top.findNode("trickplayBackground")
-    m.throttleTimer = m.top.findNode("throttleTimer")
 
     m.trickplayBackground.width = TRICKPLAY_BOX_WIDTH
     m.trickplayBackground.height = TRICKPLAY_BOX_HEIGHT
-
-    m.throttleTimer.repeat = false
-    m.throttleTimer.duration = TRICKPLAY_LOAD_THROTTLE_SECONDS
 
     ' A starts as the active buffer.
     m.activeImage = m.trickplayImageA
@@ -47,27 +36,14 @@ sub init()
     m.activeTileUri = ""
     m.loadingTileUri = ""
 
-    ' "Requested" always reflects the most recent position the user
-    ' scrubbed to, whether or not a load has actually started for it yet.
     m.requestedTileIndex = -1
     m.requestedTileUri = ""
-    m.requestedTranslation = [0, 0]
-    m.requestedClippingRect = [0, 0, 0, 0]
-    m.requestedMosaicWidth = 0
-    m.requestedMosaicHeight = 0
-    m.requestedLoadWidth = 0
-    m.requestedLoadHeight = 0
-
-    ' True while we are inside a throttle window and a re-arm is pending.
-    m.throttleActive = false
 
     m.top.observeField("position", "onPositionChanged")
     m.top.observeField("trickplayData", "onTrickplayDataChanged")
 
     m.trickplayImageA.observeField("loadStatus", "onImageALoadStatus")
     m.trickplayImageB.observeField("loadStatus", "onImageBLoadStatus")
-
-    m.throttleTimer.observeField("fire", "onThrottleTimerFire")
 end sub
 
 
@@ -103,9 +79,6 @@ sub onTrickplayDataChanged()
 
     m.trickplayImageA.uri = ""
     m.trickplayImageB.uri = ""
-
-    m.throttleActive = false
-    m.throttleTimer.control = "stop"
 
     if isValid(m.top.position)
         displayTrickplayImage(m.top.position)
@@ -216,48 +189,53 @@ sub displayTrickplayImage(position as float)
         loadTileHeight
     ]
 
+    ' ------------------------------------------------------------
+    ' Configure BOTH buffers geometrically.
+    '
+    ' This is intentional and preserves the behavior of the
+    ' double-buffer version that was visually smooth.
+    ' ------------------------------------------------------------
+
+    configureImage(
+        m.trickplayImageA,
+        mosaicWidth,
+        mosaicHeight,
+        imageTranslation,
+        imageClippingRect,
+        loadMosaicWidth,
+        loadMosaicHeight
+    )
+
+    configureImage(
+        m.trickplayImageB,
+        mosaicWidth,
+        mosaicHeight,
+        imageTranslation,
+        imageClippingRect,
+        loadMosaicWidth,
+        loadMosaicHeight
+    )
+
     m.trickplayBackground.translation = [boxLeft, 0]
     m.trickplayBackground.visible = true
 
-    ' Always remember the most recent requested target, whether or not
-    ' a load actually starts for it right now. The throttle timer uses
-    ' this to pick up the latest position once its window elapses.
-    m.requestedTileIndex = tileIndex
-    m.requestedTileUri = tileUri
-    m.requestedTranslation = imageTranslation
-    m.requestedClippingRect = imageClippingRect
-    m.requestedMosaicWidth = mosaicWidth
-    m.requestedMosaicHeight = mosaicHeight
-    m.requestedLoadWidth = loadMosaicWidth
-    m.requestedLoadHeight = loadMosaicHeight
-
     ' ------------------------------------------------------------
-    ' CASE 0: requested tile belongs to the mosaic that is currently
-    ' ACTIVE on screen.
-    '
-    ' This is just moving the crop window inside an already-decoded
-    ' texture, so it is cheap and must stay immediate/unthrottled.
-    '
-    ' CRITICAL: only the active buffer is touched here. The loading
-    ' buffer (if any) is left completely alone, so a texture that is
-    ' still decoding never gets reassigned to a different target tile.
+    ' REQUESTED TILE IS ALREADY ACTIVE.
     ' ------------------------------------------------------------
 
     if tileIndex = m.activeTileIndex
-        configureImage(m.activeImage, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+        m.requestedTileIndex = tileIndex
+        m.requestedTileUri = tileUri
         return
     end if
 
     ' ------------------------------------------------------------
-    ' CASE 1: requested tile belongs to the mosaic that is already
-    ' loading.
-    '
-    ' The loading buffer is invisible at this point, so repositioning
-    ' it has no visual effect - safe to do on every tick.
+    ' REQUESTED TILE IS ALREADY LOADING.
     ' ------------------------------------------------------------
 
-    if tileIndex = m.loadingTileIndex
-        configureImage(m.loadingImage, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+    if tileIndex = m.loadingTileIndex and tileUri = m.loadingTileUri
+        m.requestedTileIndex = tileIndex
+        m.requestedTileUri = tileUri
 
         if m.loadingImage.loadStatus = "ready"
             onLoadingImageReady()
@@ -267,85 +245,79 @@ sub displayTrickplayImage(position as float)
     end if
 
     ' ------------------------------------------------------------
-    ' CASE 2: the mosaic is already fully decoded in the OTHER buffer
-    ' (the user scrubbed back into a mosaic seen earlier). This is
-    ' effectively free (no decode needed), so it also bypasses the
-    ' throttle and swaps in right away.
+    ' REQUESTED URI ALREADY LOADED IN BUFFER A.
     ' ------------------------------------------------------------
 
     if m.trickplayImageA.uri = tileUri and m.trickplayImageA.loadStatus = "ready"
-        promoteReadyBuffer(m.trickplayImageA, true, tileIndex, tileUri, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+
+        if m.loadingIsA
+            m.loadingTileIndex = tileIndex
+            m.loadingTileUri = tileUri
+
+            m.requestedTileIndex = tileIndex
+            m.requestedTileUri = tileUri
+
+            onLoadingImageReady()
+        else
+            m.activeTileIndex = tileIndex
+            m.activeTileUri = tileUri
+
+            m.requestedTileIndex = tileIndex
+            m.requestedTileUri = tileUri
+        end if
+
         return
     end if
+
+    ' ------------------------------------------------------------
+    ' REQUESTED URI ALREADY LOADED IN BUFFER B.
+    ' ------------------------------------------------------------
 
     if m.trickplayImageB.uri = tileUri and m.trickplayImageB.loadStatus = "ready"
-        promoteReadyBuffer(m.trickplayImageB, false, tileIndex, tileUri, mosaicWidth, mosaicHeight, imageTranslation, imageClippingRect, loadMosaicWidth, loadMosaicHeight)
+
+        if not m.loadingIsA
+            m.loadingTileIndex = tileIndex
+            m.loadingTileUri = tileUri
+
+            m.requestedTileIndex = tileIndex
+            m.requestedTileUri = tileUri
+
+            onLoadingImageReady()
+        else
+            m.activeTileIndex = tileIndex
+            m.activeTileUri = tileUri
+
+            m.requestedTileIndex = tileIndex
+            m.requestedTileUri = tileUri
+        end if
+
         return
     end if
 
     ' ------------------------------------------------------------
-    ' CASE 3: genuinely new mosaic, not cached anywhere.
+    ' NEW MOSAIC.
     '
-    ' This is the only case that requires decoding a brand-new
-    ' texture, so it is the only case that gets throttled: the first
-    ' crossing fires immediately, further crossings while the timer
-    ' is armed just update m.requested* and wait for the next tick.
+    ' NEVER change the active URI.
+    ' Only the inactive buffer receives the new URI.
     ' ------------------------------------------------------------
 
-    if not m.throttleActive
-        startLoadingRequestedTile()
-    end if
-end sub
+    m.requestedTileIndex = tileIndex
+    m.requestedTileUri = tileUri
 
-
-' Loads the current m.requested* target into the loading buffer and
-' arms the throttle window. Called both for the immediate (first
-' crossing) case and from the throttle timer for subsequent crossings.
-sub startLoadingRequestedTile()
-    tileIndex = m.requestedTileIndex
-    tileUri = m.requestedTileUri
-
-    ' NEVER change the active URI.
-    ' Only the inactive (loading) buffer receives the new URI.
     m.loadingTileIndex = tileIndex
     m.loadingTileUri = tileUri
 
     m.loadingImage.visible = false
 
-    configureImage(
-        m.loadingImage,
-        m.requestedMosaicWidth,
-        m.requestedMosaicHeight,
-        m.requestedTranslation,
-        m.requestedClippingRect,
-        m.requestedLoadWidth,
-        m.requestedLoadHeight
-    )
-
-    m.throttleActive = true
-    m.throttleTimer.control = "start"
+    ' loadWidth/loadHeight MUST be assigned before URI.
+    m.loadingImage.loadWidth = loadMosaicWidth
+    m.loadingImage.loadHeight = loadMosaicHeight
 
     if m.loadingImage.uri <> tileUri
         m.loadingImage.uri = tileUri
     else if m.loadingImage.loadStatus = "ready"
         onLoadingImageReady()
     end if
-end sub
-
-
-' A buffer already holds the exact decoded texture we need (the user
-' scrubbed back into a mosaic seen earlier). Adopt it as the loading
-' buffer and let the normal ready-check swap it in immediately.
-sub promoteReadyBuffer(image as object, isA as boolean, tileIndex as integer, tileUri as string, mosaicWidth as float, mosaicHeight as float, translation as object, clippingRect as object, loadWidth as float, loadHeight as float)
-    m.loadingImage = image
-    m.loadingIsA = isA
-
-    configureImage(image, mosaicWidth, mosaicHeight, translation, clippingRect, loadWidth, loadHeight)
-
-    m.loadingTileIndex = tileIndex
-    m.loadingTileUri = tileUri
-
-    onLoadingImageReady()
 end sub
 
 
@@ -435,28 +407,9 @@ sub swapImages()
 end sub
 
 
-' Fires roughly every TRICKPLAY_LOAD_THROTTLE_SECONDS while the user
-' keeps crossing into new mosaics faster than they can load.
-sub onThrottleTimerFire(event as object)
-    ' Caught up: the most recent requested position is already active
-    ' or already loading, nothing new to fetch. Release the throttle so
-    ' the next real crossing fires immediately again.
-    if m.requestedTileIndex = m.activeTileIndex or m.requestedTileIndex = m.loadingTileIndex
-        m.throttleActive = false
-        return
-    end if
-
-    ' Still behind: load the most recent pending mosaic and keep the
-    ' cadence capped by re-arming the timer.
-    startLoadingRequestedTile()
-end sub
-
-
 sub hide()
     m.trickplayImageA.visible = false
     m.trickplayImageB.visible = false
     m.trickplayBackground.visible = false
-
-    m.throttleActive = false
-    m.throttleTimer.control = "stop"
 end sub
+
