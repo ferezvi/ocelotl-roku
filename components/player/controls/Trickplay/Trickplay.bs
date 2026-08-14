@@ -362,10 +362,6 @@ sub updateTrickplay(trickPosition as float)
     m.trickplayTargetTile = tileIndex
     m.trickplayTargetThumbnail = iconIndex
 
-    if iconIndex = m.trickplayCurrentThumbnail and tileIndex = m.trickplayCurrentTile
-        return
-    end if
-
     ' --------------------------------------------------------
     ' Find requested tile.
     ' --------------------------------------------------------
@@ -454,14 +450,10 @@ sub updateTrickplay(trickPosition as float)
         trickplayImage.visible = true
     end if
 
-    tileChanged = tileIndex <> m.trickplayCurrentTile
-
     m.trickplayCurrentTile = tileIndex
     m.trickplayCurrentThumbnail = iconIndex
 
-    if tileChanged
-        prepareTrickplayNeighbors(tileIndex)
-    end if
+    prepareTrickplayNeighbors(tileIndex)
 end sub
 
 
