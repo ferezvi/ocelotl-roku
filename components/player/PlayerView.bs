@@ -331,10 +331,12 @@ end sub
 sub applySubtitleContent(item as object)
     m.top.unobserveField("SelectedSubtitle")
 
-    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(item.SelectedSubtitle, item.fullSubtitleData)
+    selectedSubtitleIndex = isValid(item.SelectedSubtitle) ? item.SelectedSubtitle : SubtitleSelection.NOTSET
 
-    if m.top.SelectedSubtitle <> item.SelectedSubtitle
-        m.top.SelectedSubtitle = item.SelectedSubtitle
+    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(selectedSubtitleIndex, item.fullSubtitleData)
+
+    if m.top.SelectedSubtitle <> selectedSubtitleIndex
+        m.top.SelectedSubtitle = selectedSubtitleIndex
     end if
 
     m.top.observeField("SelectedSubtitle", "onSubtitleChange")
@@ -345,7 +347,7 @@ end sub
 ' fields (subtitleTrack, globalCaptionMode, previousSubtitleWasEncoded).
 ' Must run BEFORE SelectedSubtitle is assigned - onSubtitleChange only reads
 ' these fields to decide whether a reload is needed, it does not set them.
-function applySubtitleTrackFields(subtitleIndex as integer, subtitleData as object) as boolean
+function applySubtitleTrackFields(subtitleIndex as dynamic, subtitleData as object) as boolean
     selectedSubtitle = invalid
     for each subtitle in subtitleData
         if subtitle.Index = subtitleIndex
