@@ -6,8 +6,13 @@ import "pkg:/source/utils/misc.bs"
 
 const SCREEN_WIDTH = 1920
 
-const TRICKPLAY_MAX_MOSAIC_WIDTH = 1280
-const TRICKPLAY_MAX_MOSAIC_HEIGHT = 720
+' Limit decoded Trickplay mosaics to the FHD design resolution.
+' Roku automatically scales the SceneGraph UI for HD devices (2/3 factor,
+' e.g. 1920x1080 -> 1280x720), so requesting FHD dimensions here already
+' resolves to the correct native size on HD hardware. Hardcoding a lower
+' value would get scaled down a second time and end up smaller than intended.
+const TRICKPLAY_MAX_MOSAIC_WIDTH = 1920
+const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1080
 
 const TRICKPLAY_BOX_WIDTH = 320
 const TRICKPLAY_BOX_HEIGHT = 180
@@ -152,8 +157,6 @@ sub onTrickplayDataChanged()
 
     m.iconInterval = m.trickplayDataFinal.Interval / 1000
 
-    print "[Trickplay] DATA video="; videoId; " interval="; m.iconInterval; " thumbs="; m.trickplayDataFinal.ThumbnailCount; " tile="; m.trickplayDataFinal.TileWidth; "x"; m.trickplayDataFinal.TileHeight
-
     resetTrickplayBuffers()
 
     ' Poster preload no longer starts here. It waits for posterFileReady,
@@ -232,8 +235,6 @@ sub preloadPriorityTrickplayTile()
     m.trickplayPriorityPreloadStarted = true
     m.trickplayBufferTiles[1] = tileIndex
     m.trickplayBufferLoading[1] = true
-
-    print "[Trickplay] PRIORITY PRELOAD START tile="; tileIndex; " uri=tmp:/" + videoId + "-" + tileIndex.ToStr() + ".jpg"
 
     image.uri = "tmp:/" + videoId + "-" + tileIndex.ToStr() + ".jpg"
 end sub
@@ -318,8 +319,6 @@ sub preloadFirstTrickplayPoster()
     ' onTrickplayImageLoadStatusChanged recognizes it when it comes back ready.
     m.trickplayBufferTiles[0] = 0
     m.trickplayBufferLoading[0] = true
-
-    print "[Trickplay] POSTER PRELOAD START uri=tmp:/" + videoId + "-0.jpg"
 
     poster.uri = "tmp:/" + videoId + "-0.jpg"
 end sub
@@ -440,8 +439,6 @@ sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
 
     trickplayImage.width = mosaicWidth
     trickplayImage.height = mosaicHeight
-
-    print "[Trickplay] LOAD REQUEST buffer="; bufferIndex; " tile="; tileIndex
 
     trickplayImage.uri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
 end sub
@@ -624,8 +621,6 @@ sub updateTrickplay(trickPosition as float)
 
         ' Tile 0 may already have been preloaded by the invisible Poster.
         if tileIndex = 0 and m.trickplayPosterPreloadReady
-            print "[Trickplay] USING PRELOADED POSTER buffer=0"
-
             m.trickplayBufferTiles[0] = 0
             m.trickplayBufferLoading[0] = false
             bufferIndex = 0
@@ -725,12 +720,8 @@ sub onTrickplayImageLoadStatusChanged()
 
             tileIndex = m.trickplayBufferTiles[i]
 
-            print "[Trickplay] READY buffer="; i; " tile="; tileIndex
-
             if i = 0 and tileIndex = 0 and m.trickplayPosterPreloadStarted
                 m.trickplayPosterPreloadReady = true
-
-                print "[Trickplay] POSTER PRELOAD READY"
             end if
 
             if m.top.isSeeking
@@ -742,8 +733,6 @@ sub onTrickplayImageLoadStatusChanged()
             end if
 
         else if status = "failed"
-
-            print "[Trickplay] FAILED buffer="; i; " tile="; m.trickplayBufferTiles[i]
 
             m.trickplayBufferLoading[i] = false
 

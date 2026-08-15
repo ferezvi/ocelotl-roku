@@ -95,13 +95,11 @@ sub init()
 end sub
 
 sub onFirstTrickplayTileReady()
-    print "[PlayerView] firstTileReady fired, value="; m.preloadTrickplayImagesTask.firstTileReady
     if not m.preloadTrickplayImagesTask.firstTileReady
         return
     end if
 
     m.trickplay.posterFileReady = true
-    print "[PlayerView] posterFileReady set on trickplay node"
 end sub
 
 sub onTrickplayPreviewPositionChanged()
@@ -207,7 +205,6 @@ sub onVideoContentLoaded()
             m.preloadTrickplayImagesTask.control = TaskControl.RUN
             m.waitingForPriorityTrickplay = (priorityTileIndex >= 0)
             m.priorityTileIndexForTrickplay = priorityTileIndex
-            print "[PlayerView] resumeSeconds="; resumeSeconds; " priorityTile="; priorityTileIndex; " waiting="; m.waitingForPriorityTrickplay
         end if
     end if
 
@@ -296,7 +293,6 @@ sub onVideoContentLoaded()
         m.top.appendChild(m.trickplayStartTimeoutTimer)
         m.trickplayStartTimeoutTimer.control = "start"
 
-        print "[PlayerView] Deferring playback start, waiting on priority trickplay tiles"
     else
         m.top.control = VideoControl.PLAY
         m.top.setFocus(true)
@@ -308,8 +304,6 @@ sub onPriorityTrickplayTilesReady()
         return
     end if
 
-    print "[PlayerView] priorityTilesReady, starting playback"
-
     if isValid(m.priorityTileIndexForTrickplay) and m.priorityTileIndexForTrickplay > 0
         m.trickplay.priorityTileIndex = m.priorityTileIndexForTrickplay
         m.trickplay.priorityTileReady = true
@@ -320,7 +314,6 @@ end sub
 
 
 sub onTrickplayStartTimeout()
-    print "[PlayerView] Trickplay priority timeout, starting playback anyway"
     beginDeferredPlayback()
 end sub
 
@@ -336,8 +329,9 @@ sub beginDeferredPlayback()
         m.trickplayStartTimeoutTimer.control = "stop"
     end if
 
-    m.playerSpinner.visible = false
-
+    ' Leave the spinner visible through the handoff to VideoControl.PLAY —
+    ' onStateChanged will take over once BUFFERING fires. Turning it off
+    ' here creates a black-frame flash before that event arrives.
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)
 end sub
