@@ -684,10 +684,9 @@ function handleTransportCommand(data as object) as object
     return ret
 end function
 
-' Temporary toggle while the new player is under construction.
-' TODO: move to a real user/registry setting once ready for QA,
-' then remove the legacy branch entirely once PlayerView
+' Reads the user's preference for which video player to use.
+' TODO: remove the legacy branch entirely once PlayerView
 ' replaces VideoPlayerView for good.
 function useNewPlayer() as boolean
-    return true ' set to false to fall back to the legacy player
+    return m.global.session.user.settings["playback.player.experimental"] = true
 end function
