@@ -53,6 +53,8 @@ end sub
 ' the show) and stops it once the OSD is hidden, so it doesn't fire a
 ' stray "hide" action while already hidden.
 sub onVisibleChanged()
+    print "[PlayerOSD] visible="; m.top.visible
+
     if m.top.visible
         resetInactivityTimer()
     else

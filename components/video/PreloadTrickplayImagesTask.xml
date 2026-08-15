@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <component name="PreloadTrickplayImagesTask" extends="Task">
     <interface>
         <field id="videoID" type="string" />
         <field id="method" type="string" />
         <field id="numImagesToLoad" type="integer" />
         <field id="trickplayWidth" type="integer" />
+        <field id="firstTileReady" type="boolean" alwaysNotify="true" />
+        <field id="priorityTileIndex" type="integer" value="-1" />
+        <field id="priorityTilesReady" type="boolean" alwaysNotify="true" />
     </interface>
 </component>

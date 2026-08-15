@@ -73,7 +73,13 @@ sub init()
 
     m.preloadTrickplayImagesTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
     m.preloadTrickplayImagesTask.videoID = currentItem.id
+    ' Forwards to Trickplay once tile 0 is confirmed on disk.
+    m.preloadTrickplayImagesTask.observeField("firstTileReady", "onFirstTrickplayTileReady")
+    ' Gates VideoControl.PLAY on resume, until the resume-position tile is ready.
+    m.preloadTrickplayImagesTask.observeField("priorityTilesReady", "onPriorityTrickplayTilesReady")
     m.top.appendChild(m.preloadTrickplayImagesTask)
+
+    m.waitingForPriorityTrickplay = false
 
     ' --------------------------------------------------------
     ' Playback reporting.
@@ -86,6 +92,16 @@ sub init()
     centerSpinnerPercentLabel()
 
     m.top.setFocus(true)
+end sub
+
+sub onFirstTrickplayTileReady()
+    print "[PlayerView] firstTileReady fired, value="; m.preloadTrickplayImagesTask.firstTileReady
+    if not m.preloadTrickplayImagesTask.firstTileReady
+        return
+    end if
+
+    m.trickplay.posterFileReady = true
+    print "[PlayerView] posterFileReady set on trickplay node"
 end sub
 
 sub onTrickplayPreviewPositionChanged()
@@ -161,11 +177,37 @@ sub onVideoContentLoaded()
         thumbnailsPerTile = trickplayDataFinal.TileHeight * trickplayDataFinal.TileWidth
 
         if thumbnailsPerTile > 0
+            ' Reset before restarting the task, so a stale "true" from
+            ' a previous video isn't mistaken for this one's readiness.
+            m.trickplay.posterFileReady = false
+
+            resumeSeconds = 0
+            if isValid(item.content) and isValid(item.content.PlayStart)
+                resumeSeconds = item.content.PlayStart
+            end if
+
+            maxTileIndex = fix((trickplayDataFinal.ThumbnailCount - 1) / thumbnailsPerTile)
+            priorityTileIndex = -1
+
+            if resumeSeconds > 0 and isValid(trickplayDataFinal.Interval) and trickplayDataFinal.Interval > 0
+                iconInterval = trickplayDataFinal.Interval / 1000
+                iconIndex = fix(resumeSeconds / iconInterval)
+                priorityTileIndex = fix(iconIndex / thumbnailsPerTile)
+
+                if priorityTileIndex > maxTileIndex
+                    priorityTileIndex = maxTileIndex
+                end if
+            end if
+
             m.preloadTrickplayImagesTask.videoID = item.id
-            m.preloadTrickplayImagesTask.numImagesToLoad = fix((trickplayDataFinal.ThumbnailCount - 1) / thumbnailsPerTile)
+            m.preloadTrickplayImagesTask.numImagesToLoad = maxTileIndex
             m.preloadTrickplayImagesTask.trickplayWidth = trickplayDataFinal.Width
+            m.preloadTrickplayImagesTask.priorityTileIndex = priorityTileIndex
             m.preloadTrickplayImagesTask.method = "ADD"
             m.preloadTrickplayImagesTask.control = TaskControl.RUN
+            m.waitingForPriorityTrickplay = (priorityTileIndex >= 0)
+            m.priorityTileIndexForTrickplay = priorityTileIndex
+            print "[PlayerView] resumeSeconds="; resumeSeconds; " priorityTile="; priorityTileIndex; " waiting="; m.waitingForPriorityTrickplay
         end if
     end if
 
@@ -244,6 +286,58 @@ sub onVideoContentLoaded()
     end if
 
     ' Start playback.
+    if m.waitingForPriorityTrickplay
+        m.playerSpinner.visible = true
+
+        m.trickplayStartTimeoutTimer = CreateObject("roSGNode", "Timer")
+        m.trickplayStartTimeoutTimer.duration = 5
+        m.trickplayStartTimeoutTimer.repeat = false
+        m.trickplayStartTimeoutTimer.observeField("fire", "onTrickplayStartTimeout")
+        m.top.appendChild(m.trickplayStartTimeoutTimer)
+        m.trickplayStartTimeoutTimer.control = "start"
+
+        print "[PlayerView] Deferring playback start, waiting on priority trickplay tiles"
+    else
+        m.top.control = VideoControl.PLAY
+        m.top.setFocus(true)
+    end if
+end sub
+
+sub onPriorityTrickplayTilesReady()
+    if not m.preloadTrickplayImagesTask.priorityTilesReady
+        return
+    end if
+
+    print "[PlayerView] priorityTilesReady, starting playback"
+
+    if isValid(m.priorityTileIndexForTrickplay) and m.priorityTileIndexForTrickplay > 0
+        m.trickplay.priorityTileIndex = m.priorityTileIndexForTrickplay
+        m.trickplay.priorityTileReady = true
+    end if
+
+    beginDeferredPlayback()
+end sub
+
+
+sub onTrickplayStartTimeout()
+    print "[PlayerView] Trickplay priority timeout, starting playback anyway"
+    beginDeferredPlayback()
+end sub
+
+
+sub beginDeferredPlayback()
+    if not m.waitingForPriorityTrickplay
+        return
+    end if
+
+    m.waitingForPriorityTrickplay = false
+
+    if isValid(m.trickplayStartTimeoutTimer)
+        m.trickplayStartTimeoutTimer.control = "stop"
+    end if
+
+    m.playerSpinner.visible = false
+
     m.top.control = VideoControl.PLAY
     m.top.setFocus(true)
 end sub
