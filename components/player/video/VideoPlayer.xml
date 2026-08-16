@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<component name="PlayerView" extends="Video" focusable="true">
+<component name="VideoPlayer" extends="Video" focusable="true">
 
     <interface>
         <!-- state, position, duration, errorCode, content, control are inherited from Video -->
