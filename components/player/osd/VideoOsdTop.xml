@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="VideoOsdTop" extends="Group">
+    <interface>
+        <field id="itemTitle" type="string" />
+        <field id="itemSubtitle" type="string" />
+        <field id="itemSeason" type="string" />
+        <field id="itemEpisode" type="string" />
+        <field id="itemEpisodeEnd" type="string" />
+        <field id="itemLogo" type="string" />
+    </interface>
+
+    <children>
+        <Poster id="logoImagePoster" visible="false" translation="[103, 61]" />
+        <LayoutGroup id="videoInfo" layoutDirection="vert" translation="[103, 61]">
+            <ScrollingText id="itemTitleLabel" font="font:LargeBoldSystemFont" maxWidth="1400" />
+            <LayoutGroup id="episodeInfo" layoutDirection="horiz">
+                <Text id="itemSeasonLabel" font="font:MediumSystemFont" color="0xffffffFF" />
+                <Text id="itemEpisodeLabel" font="font:MediumSystemFont" color="0xffffffFF" />
+                <Text id="itemEpisodeEndLabel" font="font:MediumSystemFont" color="0xffffffFF" />
+            </LayoutGroup>
+        </LayoutGroup>
+        <Clock id="clock" translation="[1618, 46]" />
+    </children>
+</component>

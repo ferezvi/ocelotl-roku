@@ -15,6 +15,7 @@ sub init()
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
     m.synopsisPanel = m.top.findNode("synopsisPanel")
+    m.osdTop = m.top.findNode("topOSD")
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
 
@@ -24,6 +25,11 @@ sub init()
     m.top.observeField("visible", "onVisibleChanged")
     m.top.observeField("playbackState", "onIsPlayingChanged")
     m.top.observeField("overview", "onOverviewChanged")
+    m.top.observeField("itemTitle", "onItemTitleChanged")
+    m.top.observeField("itemSeason", "onItemSeasonChanged")
+    m.top.observeField("itemEpisode", "onItemEpisodeChanged")
+    m.top.observeField("itemEpisodeEnd", "onItemEpisodeEndChanged")
+    m.top.observeField("itemLogo", "onItemLogoChanged")
 
     m.videoControls.observeField("keyPressed", "onKeyPressed")
     m.progressBar.observeField("keyPressed", "onKeyPressed")
@@ -118,6 +124,30 @@ end sub
 
 sub onIsPlayingChanged()
     m.videoControls.playbackState = m.top.playbackState
+end sub
+
+' ------------------------------------------------------------
+' Top OSD metadata
+' ------------------------------------------------------------
+
+sub onItemTitleChanged()
+    m.osdTop.itemTitle = m.top.itemTitle
+end sub
+
+sub onItemSeasonChanged()
+    m.osdTop.itemSeason = m.top.itemSeason
+end sub
+
+sub onItemEpisodeChanged()
+    m.osdTop.itemEpisode = m.top.itemEpisode
+end sub
+
+sub onItemEpisodeEndChanged()
+    m.osdTop.itemEpisodeEnd = m.top.itemEpisodeEnd
+end sub
+
+sub onItemLogoChanged()
+    m.osdTop.itemLogo = m.top.itemLogo
 end sub
 
 ' ------------------------------------------------------------

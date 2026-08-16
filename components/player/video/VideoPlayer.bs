@@ -17,11 +17,10 @@ sub init()
     m.top.enableUI = false
 
     ' Player UI.
-    m.playerOSD = m.top.findNode("playerOSD")
+    m.videoOsd = m.top.findNode("playerOSD")
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
-    m.progressBar = m.playerOSD.findNode("progressBar")
-    m.topOSD = m.playerOSD.findNode("topOSD")
+    m.progressBar = m.videoOsd.findNode("progressBar")
 
     ' Trickplay is now fully encapsulated in its own component.
     m.trickplay = m.top.findNode("trickplay")
@@ -30,9 +29,9 @@ sub init()
 
 
     ' Player OSD events.
-    m.playerOSD.observeField("trackSelected", "onTrackSelected")
-    m.playerOSD.observeField("action", "onOSDAction")
-    m.playerOSD.observeField("visible", "onOSDVisibilityChanged")
+    m.videoOsd.observeField("trackSelected", "onTrackSelected")
+    m.videoOsd.observeField("action", "onOSDAction")
+    m.videoOsd.observeField("visible", "onOSDVisibilityChanged")
 
     ' Video events.
     m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
@@ -224,7 +223,7 @@ sub onVideoContentLoaded()
     m.top.transcodeParams = item.transcodeparams
     m.top.isTranscoded = item.isTranscoded
 
-    m.playerOSD.videoId = item.id
+    m.videoOsd.videoId = item.id
     m.top.content = item.content
 
     ' Falls back to track 0 if audioIndex is invalid.
@@ -242,12 +241,12 @@ sub onVideoContentLoaded()
 
     applySubtitleContent(item)
 
-    m.playerOSD.fullAudioData = item.fullAudioData
-    m.playerOSD.fullSubtitleData = item.fullSubtitleData
-    m.playerOSD.audioIndex = item.audioIndex
-    m.playerOSD.selectedSubtitleIndex = item.SelectedSubtitle
-    m.playerOSD.itemId = item.id
-    m.playerOSD.overview = item.overview
+    m.videoOsd.fullAudioData = item.fullAudioData
+    m.videoOsd.fullSubtitleData = item.fullSubtitleData
+    m.videoOsd.audioIndex = item.audioIndex
+    m.videoOsd.selectedSubtitleIndex = item.SelectedSubtitle
+    m.videoOsd.itemId = item.id
+    m.videoOsd.overview = item.overview
 
     ' --------------------------------------------------------
     ' OSD metadata.
@@ -257,21 +256,21 @@ sub onVideoContentLoaded()
         ' Live content uses the same player flow.
     end if
 
-    m.topOSD.itemTitleText = item.content.title
+    m.videoOsd.itemTitle = item.content.title
 
     if isValid(item.seasonNumber)
-        m.topOSD.seasonNumber = item.seasonNumber.ToStr()
+        m.videoOsd.itemSeason = item.seasonNumber.ToStr()
     end if
 
     if isValid(item.episodeNumber)
-        m.topOSD.episodeNumber = item.episodeNumber.ToStr()
+        m.videoOsd.itemEpisode = item.episodeNumber.ToStr()
     end if
 
     if isValid(item.episodeNumberEnd)
-        m.topOSD.episodeNumberEnd = item.episodeNumberEnd.ToStr()
+        m.videoOsd.itemEpisodeEnd = item.episodeNumberEnd.ToStr()
     end if
 
-    m.topOSD.logoImage = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
+    m.videoOsd.itemLogo = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
 
     ' --------------------------------------------------------
     ' Initial audio selection.
@@ -342,7 +341,7 @@ end sub
 ' ============================================================
 
 sub onStateChanged()
-    m.playerOSD.playbackState = m.top.state
+    m.videoOsd.playbackState = m.top.state
 
     ' Keep custom captions synchronized with playback.
     if isValid(m.captionTask)
@@ -452,7 +451,7 @@ end sub
 ' ============================================================
 
 sub onVideoPositionChanged()
-    progressBar = m.playerOSD.findNode("progressBar")
+    progressBar = m.videoOsd.findNode("progressBar")
 
     if progressBar <> invalid and m.top.position <> invalid and m.top.duration <> invalid
         progressBar.position = m.top.position
@@ -509,7 +508,7 @@ end sub
 
 
 sub onTrackSelected()
-    selection = m.playerOSD.trackSelected
+    selection = m.videoOsd.trackSelected
 
     if not isValid(selection)
         return
@@ -709,7 +708,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
-    if m.playerOSD.visible
+    if m.videoOsd.visible
         return false
     end if
 
@@ -718,26 +717,26 @@ function onKeyEvent(key as string, press as boolean) as boolean
             m.top.control = VideoControl.PAUSE
         end if
 
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusControls")
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
 
         return true
 
     else if isStringEqual(key, KeyCode.UP)
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusOptionControls")
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusOptionControls")
 
         return true
 
     else if isStringEqual(key, KeyCode.DOWN)
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusControls")
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
 
         return true
 
     else if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.FASTFORWRD) or isStringEqual(key, KeyCode.REWIND)
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusProgressBar")
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusProgressBar")
 
         direction = (isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)) ? 1 : -1
 
@@ -757,13 +756,13 @@ end function
 
 
 sub handlePlayKey()
-    if not m.playerOSD.visible
+    if not m.videoOsd.visible
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
             m.top.control = VideoControl.PAUSE
         end if
 
-        m.playerOSD.visible = true
-        m.playerOSD.callFunc("focusControls")
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
 
     else
         if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
@@ -800,8 +799,8 @@ sub onOSDAction(event as object)
         m.top.seek = m.top.position + SKIP_SECONDS
 
     else if action = "seek"
-        if m.playerOSD.seekPosition <> invalid
-            m.top.seek = m.playerOSD.seekPosition
+        if m.videoOsd.seekPosition <> invalid
+            m.top.seek = m.videoOsd.seekPosition
         end if
 
     else if action = "seekStart"
@@ -817,16 +816,16 @@ end sub
 
 
 sub onOSDVisibilityChanged()
-    if not m.playerOSD.visible
+    if not m.videoOsd.visible
         m.top.setFocus(true)
     end if
 end sub
 
 
 sub hideOSD()
-    m.playerOSD.setFocus(false)
+    m.videoOsd.setFocus(false)
     m.top.setFocus(true)
-    m.playerOSD.visible = false
+    m.videoOsd.visible = false
 end sub
 
 

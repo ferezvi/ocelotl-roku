@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<component name="PlayerOSD" extends="Group">
+<component name="VideoOsd" extends="Group">
     <interface>
         <function name="focusControls" />
         <function name="focusProgressBar" />
@@ -10,6 +10,11 @@
         <field id="playbackState" type="string" />
         <field id="itemId" type="string" />
         <field id="overview" type="string" />
+        <field id="itemTitle" type="string" />
+        <field id="itemSeason" type="string" />
+        <field id="itemEpisode" type="string" />
+        <field id="itemEpisodeEnd" type="string" />
+        <field id="itemLogo" type="string" />
         <field id="trickplayData" type="assocarray" />
         <field id="videoId" type="string" />
 
@@ -23,7 +28,7 @@
     <children>
         <Poster id="topGradient" uri="pkg:/images/ui/gradientes/top_gradient.png" translation="[0, 0]" width="1920" height="360" />
         <Poster id="bottomGradient" uri="pkg:/images/ui/gradientes/bottom_gradient.png" translation="[0, 720]" width="1920" height="360" />
-        <PlayerOSDTop id="topOSD" />
+        <VideoOsdTop id="topOSD" />
         <SynopsisPanel id="synopsisPanel" visible="false" translation="[60, 250]" />
         <OptionControls id="optionControls" translation="[103, 200]" />
         <LanguagePanel id="languagePanel" visible="false" />
