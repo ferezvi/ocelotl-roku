@@ -1,0 +1,295 @@
+PLAN DE IMPLEMENTACIÓN — PLAYER OCELOTL
+============================================
+
+Objetivo
+--------
+Completar las funcionalidades del player Ocelotl que todavía existen en el
+player legacy, manteniendo la arquitectura nueva y evitando copiar lógica
+innecesaria del legacy.
+
+Principio de trabajo
+--------------------
+Legacy nos dice QUÉ debe hacer.
+Ocelotl decide CÓMO hacerlo.
+
+No se copiará código del legacy directamente salvo que sea estrictamente
+necesario. Cada feature se adaptará a la arquitectura actual de Ocelotl.
+
+
+FASE 1 — ROBUSTEZ DEL REPRODUCTOR
+=================================
+
+1. BUFFERING ATASCADO
+---------------------
+Prioridad: ALTA / CRÍTICA
+
+Legacy:
+- bufferStuckTimer
+- bufferCheckTimer
+
+Objetivo:
+Detectar cuando el reproductor permanece en buffering sin progreso real y
+evitar que quede colgado indefinidamente.
+
+Pasos:
+[ ] Revisar creación y configuración de bufferStuckTimer en legacy.
+[ ] Revisar creación y configuración de bufferCheckTimer en legacy.
+[ ] Revisar handlers asociados.
+[ ] Determinar qué condición considera "buffering atascado".
+[ ] Determinar qué acción toma legacy para recuperarse.
+[ ] Comparar con la arquitectura actual de Ocelotl.
+[ ] Implementar solamente la lógica necesaria en Ocelotl.
+[ ] Probar buffering normal.
+[ ] Probar recuperación después de buffering.
+[ ] Probar buffering realmente atascado.
+[ ] Verificar que no interfiera con spinner, playbackState ni ProgressBar.
+
+2. PLAYBACK CHECK
+-----------------
+Prioridad: ALTA / POR INVESTIGAR
+
+Legacy:
+- playbackCheckTimer
+
+Objetivo:
+Determinar exactamente qué comprueba este timer y si sigue siendo necesario
+en la arquitectura nueva.
+
+Pasos:
+[ ] Localizar creación del timer.
+[ ] Localizar handler.
+[ ] Identificar qué estados/campos comprueba.
+[ ] Determinar si su función ya está cubierta por Ocelotl.
+[ ] Si no está cubierta, diseñar equivalente.
+[ ] Implementar solo si aporta una función necesaria.
+[ ] Probar reproducción normal y pausada.
+
+
+FASE 2 — FEATURES VISIBLES
+==========================
+
+3. SKIP SEGMENT
+---------------
+Prioridad: ALTA
+
+Legacy:
+- skipSegment
+- hasActiveSegment
+
+Situación actual:
+El campo hasActiveSegment ya existe en la interfaz de Ocelotl, pero todavía
+no existe la UI que lo consume.
+
+Objetivo:
+Mostrar un botón para saltar intro/outro u otro segmento activo.
+
+Pasos:
+[ ] Revisar cómo legacy determina el inicio/final del segmento.
+[ ] Revisar qué evento/acción utiliza skipSegment.
+[ ] Crear componente UI en Ocelotl.
+[ ] Mostrarlo únicamente cuando hasActiveSegment sea true.
+[ ] Ejecutar seek al final del segmento.
+[ ] Integrarlo con focus.
+[ ] Integrarlo con PlayerOSD.
+[ ] Verificar ocultación automática.
+[ ] Probar intro.
+[ ] Probar outro.
+[ ] Probar cambios de segmento durante reproducción.
+
+
+4. NEXT UP
+----------
+Prioridad: ALTA
+
+Legacy:
+- nextUp
+- Rectangle
+- poster
+- textos
+
+Objetivo:
+Mostrar el siguiente episodio cuando corresponda.
+
+Arquitectura propuesta:
+
+PlayerOSD
+  ├── TopLeftControls
+  ├── VideoControls
+  ├── ProgressBar
+  ├── SkipSegment
+  └── NextUp
+
+Pasos:
+[ ] Revisar exactamente cuándo legacy muestra Next Up.
+[ ] Identificar de dónde obtiene la información del siguiente episodio.
+[ ] Identificar poster, título y metadatos utilizados.
+[ ] Determinar reglas de aparición/desaparición.
+[ ] Crear componente NextUp independiente.
+[ ] Integrarlo con PlayerOSD.
+[ ] Implementar acción OK.
+[ ] Implementar transición/reproducción del siguiente episodio.
+[ ] Verificar interacción con Skip Segment.
+[ ] Probar películas y episodios.
+
+
+FASE 3 — NAVEGACIÓN Y SUBTÍTULOS
+===============================
+
+5. CHAPTER MENU
+---------------
+Prioridad: MEDIA
+
+Legacy:
+- chapterList
+- chapterMenu
+
+Objetivo:
+Permitir navegación por capítulos cuando el contenido los tenga.
+
+Pasos:
+[ ] Revisar cómo legacy obtiene los capítulos.
+[ ] Revisar estructura de chapterList.
+[ ] Revisar UI chapterMenu.
+[ ] Determinar cómo recibe la posición seleccionada.
+[ ] Crear componente de capítulos para Ocelotl.
+[ ] Integrarlo con PlayerOSD.
+[ ] Implementar seek al capítulo.
+[ ] Manejar contenido sin capítulos.
+
+
+6. SUBTITLE TIMING
+------------------
+Prioridad: MEDIA
+
+Legacy:
+- subtitleTimingButtons
+
+Objetivo:
+Permitir ajustar manualmente la sincronización de subtítulos.
+
+Operaciones esperadas:
+- +/-500 ms
+- +/-100 ms
+- Reset
+
+Pasos:
+[ ] Revisar implementación legacy.
+[ ] Identificar API/campo utilizado para cambiar el offset.
+[ ] Determinar si Ocelotl ya tiene infraestructura para subtitle offset.
+[ ] Crear UI.
+[ ] Implementar ajustes.
+[ ] Implementar reset.
+[ ] Verificar persistencia o alcance del ajuste.
+[ ] Probar diferentes subtítulos.
+
+
+FASE 4 — UX SECUNDARIA
+======================
+
+7. BUFFERING VIDEO INFO
+-----------------------
+Prioridad: MEDIA / BAJA
+
+Legacy:
+- bufferingVideoInfo
+
+Objetivo:
+Mostrar título/temporada/episodio mientras el video está buffering.
+
+Pasos:
+[ ] Revisar UI legacy.
+[ ] Determinar cuándo aparece.
+[ ] Determinar qué información muestra.
+[ ] Integrarlo con spinner.
+[ ] Evitar duplicación de información existente en PlayerOSD.
+
+
+8. VIDEO ENDING TIME
+--------------------
+Prioridad: BAJA
+
+Legacy:
+- videoEndingTime
+
+Objetivo:
+Mostrar la hora aproximada de finalización.
+
+Pasos:
+[ ] Revisar formato utilizado por legacy.
+[ ] Determinar si aporta valor en Ocelotl.
+[ ] Implementar como elemento independiente si se conserva.
+
+
+9. CAST POPUP
+-------------
+Prioridad: BAJA / DEPENDIENTE
+
+Legacy:
+- castPopup
+- PlaybackCastPopup
+
+Objetivo:
+Determinar si esta funcionalidad sigue siendo necesaria.
+
+Pasos:
+[ ] Revisar exactamente qué hace PlaybackCastPopup.
+[ ] Determinar si corresponde a Chromecast/casting real o a otra función.
+[ ] Revisar compatibilidad con la arquitectura actual.
+[ ] Decidir si se porta o se descarta.
+
+
+FUNCIONALIDAD YA CUBIERTA
+=========================
+
+FAST FORWARD / REWIND
+---------------------
+Legacy:
+- fastForwardOrRewindTimer
+- leftTenSecondSkipTimer
+- rightTenSecondSkipTimer
+
+Estado:
+NO PORTAR POR AHORA.
+
+Motivo:
+La arquitectura nueva ya utiliza ProgressBar con hold-to-seek y aceleración
+mediante timer.
+
+Pendiente:
+[ ] Confirmar mediante pruebas que el comportamiento sea equivalente.
+[ ] Solo modificar si aparece una diferencia funcional real.
+
+
+ORDEN DE EJECUCIÓN
+==================
+
+1. [ ] Buffering: bufferStuckTimer + bufferCheckTimer
+2. [ ] Investigar playbackCheckTimer
+3. [ ] Skip Segment
+4. [ ] Next Up
+5. [ ] Chapter Menu
+6. [ ] Subtitle Timing
+7. [ ] Buffering Video Info
+8. [ ] Video Ending Time
+9. [ ] Cast Popup
+10. [ ] Validación final de FF/RW
+
+
+REGLAS PARA CADA FEATURE
+========================
+
+Antes de implementar:
+1. Revisar comportamiento del legacy.
+2. Identificar qué problema resuelve.
+3. Identificar qué partes ya existen en Ocelotl.
+4. Diseñar la integración con la arquitectura actual.
+5. Implementar el cambio mínimo necesario.
+6. Compilar.
+7. Probar.
+8. Solo después pasar al siguiente punto.
+
+No hacer varios cambios grandes simultáneamente.
+
+Mantener los componentes de Ocelotl modulares.
+Evitar trasladar timers/observers del legacy sin entender su propósito.
+No modificar funcionalidades nuevas que ya funcionan si no es necesario.

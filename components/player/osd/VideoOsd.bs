@@ -21,10 +21,13 @@ sub init()
 
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
+    m.progressBar.observeField("previewPosition", "onProgressBarPreviewPositionChanged")
 
     m.top.observeField("visible", "onVisibleChanged")
     m.top.observeField("playbackState", "onIsPlayingChanged")
     m.top.observeField("overview", "onOverviewChanged")
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("duration", "onDurationChanged")
     m.top.observeField("itemTitle", "onItemTitleChanged")
     m.top.observeField("itemSeason", "onItemSeasonChanged")
     m.top.observeField("itemEpisode", "onItemEpisodeChanged")
@@ -59,7 +62,7 @@ end sub
 ' the show) and stops it once the OSD is hidden, so it doesn't fire a
 ' stray "hide" action while already hidden.
 sub onVisibleChanged()
-    print "[PlayerOSD] visible="; m.top.visible
+    print "[VideoOsd] visible="; m.top.visible
 
     if m.top.visible
         resetInactivityTimer()
@@ -113,6 +116,8 @@ sub onProgressBarSeek()
 end sub
 
 sub onProgressBarSeekingChanged()
+    m.top.isSeeking = m.progressBar.isSeeking
+
     m.top.action = m.progressBar.isSeeking ? "seekStart" : "seekEnd"
 
     if m.progressBar.isSeeking
@@ -122,8 +127,30 @@ sub onProgressBarSeekingChanged()
     end if
 end sub
 
+sub onProgressBarPreviewPositionChanged()
+    m.top.previewPosition = m.progressBar.previewPosition
+end sub
+
 sub onIsPlayingChanged()
     m.videoControls.playbackState = m.top.playbackState
+end sub
+
+' ------------------------------------------------------------
+' Progress bar position/duration (fed from VideoPlayer, forwarded down)
+' ------------------------------------------------------------
+
+sub onPositionChanged()
+    m.progressBar.position = m.top.position
+end sub
+
+sub onDurationChanged()
+    m.progressBar.duration = m.top.duration
+end sub
+
+' Forwards seekStep to the progress bar's own preview-shift logic (used
+' for LEFT/RIGHT key nudges while the OSD is opening).
+sub seekStep(direction as integer)
+    m.progressBar.callFunc("seekStep", direction)
 end sub
 
 ' ------------------------------------------------------------

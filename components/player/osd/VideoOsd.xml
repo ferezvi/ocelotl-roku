@@ -16,6 +16,11 @@
         <field id="itemEpisodeEnd" type="string" />
         <field id="itemLogo" type="string" />
         <field id="trickplayData" type="assocarray" />
+        <field id="position" type="float" />
+        <field id="duration" type="float" />
+        <field id="previewPosition" type="float" />
+        <field id="isSeeking" type="boolean" />
+        <function name="seekStep" />
         <field id="videoId" type="string" />
 
         <field id="fullAudioData" type="array" />
