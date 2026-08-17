@@ -1,0 +1,130 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/VideoControl.bs"
+
+const SEEK_SECONDS = 10
+const SKIP_SECONDS = 30
+
+' ============================================================
+' INPUT
+' ============================================================
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+
+    if isStringEqual(key, KeyCode.PLAY)
+        handlePlayKey()
+        return true
+    end if
+
+    if m.videoOsd.visible
+        return false
+    end if
+
+    if isStringEqual(key, KeyCode.OK)
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        end if
+
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
+
+        return true
+
+    else if isStringEqual(key, KeyCode.UP)
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusOptionControls")
+
+        return true
+
+    else if isStringEqual(key, KeyCode.DOWN)
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
+
+        return true
+
+    else if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.FASTFORWRD) or isStringEqual(key, KeyCode.REWIND)
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusProgressBar")
+
+        direction = (isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)) ? 1 : -1
+
+        m.videoOsd.callFunc("seekStep", direction)
+
+        return true
+
+    else if isStringEqual(key, KeyCode.BACK)
+        m.top.control = VideoControl.STOP
+        m.global.sceneManager.callFunc("popScene")
+
+        return true
+    end if
+
+    return false
+end function
+
+sub handlePlayKey()
+    if not m.videoOsd.visible
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        end if
+
+        m.videoOsd.visible = true
+        m.videoOsd.callFunc("focusControls")
+
+    else
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+
+        else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
+            m.top.control = VideoControl.RESUME
+        end if
+    end if
+end sub
+
+sub onOSDAction(event as object)
+    action = event.getData()
+
+    if action = "playPauseButton"
+
+        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+            m.top.control = VideoControl.PAUSE
+        else
+            m.top.control = VideoControl.RESUME
+        end if
+
+    else if action = "rewindButton"
+        m.top.seek = max(0, m.top.position - SEEK_SECONDS)
+
+    else if action = "fastForwardButton"
+        m.top.seek = m.top.position + SEEK_SECONDS
+
+    else if action = "skipBackButton"
+        m.top.seek = max(0, m.top.position - SKIP_SECONDS)
+
+    else if action = "skipForwardButton"
+        m.top.seek = m.top.position + SKIP_SECONDS
+
+    else if action = "seek"
+        if m.videoOsd.seekPosition <> invalid
+            m.top.seek = m.videoOsd.seekPosition
+        end if
+
+    else if action = "seekStart"
+        m.top.control = VideoControl.PAUSE
+
+    else if action = "seekEnd"
+        m.top.control = VideoControl.RESUME
+
+    else if action = "hide"
+        hideOSD()
+    end if
+end sub
+
+sub hideOSD()
+    m.videoOsd.setFocus(false)
+    m.top.setFocus(true)
+    m.videoOsd.visible = false
+end sub

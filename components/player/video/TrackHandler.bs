@@ -1,0 +1,180 @@
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' LIFECYCLE
+' ============================================================
+
+sub init()
+    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
+    m.top.observeField("trackSelected", "onTrackSelected")
+end sub
+
+' ============================================================
+' AUDIO TRACKS
+' ============================================================
+
+sub onAvailableAudioTracksChanged()
+    if not isValidAndNotEmpty(m.top.availableAudioTracks)
+        return
+    end if
+
+    preferredAudioTrackName = m.top.preferredAudioTrackName
+
+    for each audioTrack in m.top.availableAudioTracks
+        trackName = audioTrack.LookupCI("name")
+
+        if isStringEqual(trackName, preferredAudioTrackName)
+            rokuTrackString = audioTrack.LookupCI("Track")
+
+            if not isValid(rokuTrackString)
+                return
+            end if
+
+            rokuTrackIndex = rokuTrackString.toInt()
+
+            m.global.queueManager.callFunc(
+                "setPreferredAudioTrackIndex",
+                rokuTrackIndex
+            )
+
+            m.top.audioIndex = rokuTrackIndex
+
+            if m.top.currentAudioTrack = rokuTrackString
+                return
+            end if
+
+            m.top.audioReloadIndex = rokuTrackIndex
+
+            return
+        end if
+    end for
+end sub
+
+' ============================================================
+' TRACK SELECTION
+' ============================================================
+
+sub onTrackSelected()
+    selection = m.top.trackSelected
+
+    if not isValid(selection)
+        return
+    end if
+
+    if selection.kind = "audio"
+        switchAudioTrack(
+            selection.index,
+            selection.jellyfinIndex
+        )
+
+    else if selection.kind = "subtitle"
+        selectSubtitle(selection.index)
+    end if
+end sub
+
+' ============================================================
+' AUDIO SELECTION
+' ============================================================
+
+sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
+    m.top.audioReloadIndex = -1
+
+    if desiredIndex = m.top.audioIndex
+        return
+    end if
+
+    m.top.audioIndex = jellyfinIndex
+    m.top.audioReloadIndex = desiredIndex
+end sub
+
+' ============================================================
+' SUBTITLE CONTENT
+' ============================================================
+
+sub applySubtitleContent(item as object)
+    m.top.fullSubtitleData = item.fullSubtitleData
+
+    selectedSubtitleIndex = isValid(item.SelectedSubtitle) ? item.SelectedSubtitle : SubtitleSelection.NOTSET
+
+    m.top.selectedSubtitleIndex = selectedSubtitleIndex
+
+    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(
+        selectedSubtitleIndex,
+        item.fullSubtitleData
+    )
+end sub
+
+' ============================================================
+' SUBTITLE SELECTION
+' ============================================================
+
+sub selectSubtitle(subtitleIndex as integer)
+    m.top.selectedSubtitleIndex = subtitleIndex
+
+    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(
+        subtitleIndex,
+        m.top.fullSubtitleData
+    )
+end sub
+
+' ============================================================
+' SUBTITLE TRACK FIELDS
+' ============================================================
+
+function applySubtitleTrackFields(subtitleIndex as dynamic, subtitleData as object) as boolean
+
+    selectedSubtitle = invalid
+
+    if isValid(subtitleData)
+        for each subtitle in subtitleData
+            if subtitle.Index = subtitleIndex
+                selectedSubtitle = subtitle
+                exit for
+            end if
+        end for
+    end if
+
+    if subtitleIndex = SubtitleSelection.NONE
+        m.top.globalCaptionMode = "Off"
+
+    else if isValid(selectedSubtitle) and not selectedSubtitle.IsEncoded
+        availableSubtitleTrackIndex = availSubtitleTrackIdx(selectedSubtitle.Track.TrackName)
+
+        if availableSubtitleTrackIndex <> SubtitleSelection.NONE
+            m.top.globalCaptionMode = "On"
+            m.top.subtitleTrack = m.top.availableSubtitleTracks[
+                availableSubtitleTrackIndex
+            ].TrackName
+        end if
+    end if
+
+    if not isValid(selectedSubtitle)
+        return false
+    end if
+
+    return selectedSubtitle.IsEncoded
+end function
+
+' ============================================================
+' SUBTITLE TRACK LOOKUP
+' ============================================================
+
+function availSubtitleTrackIdx(trackNameToFind as string) as integer
+
+    idx = 0
+
+    if not isValid(m.top.availableSubtitleTracks)
+        return SubtitleSelection.NONE
+    end if
+
+    for each availTrack in m.top.availableSubtitleTracks
+        if Instr(1, availTrack.TrackName, trackNameToFind)
+            return idx
+        end if
+
+        idx = idx + 1
+    end for
+
+    return SubtitleSelection.NONE
+end function
