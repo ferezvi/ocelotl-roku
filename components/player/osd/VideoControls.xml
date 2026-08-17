@@ -3,9 +3,9 @@
 <component name="VideoControls" extends="Group">
 
     <interface>
-        <field id="itemSpacing" type="float" value="16" onChange="onItemSpacingChanged" />
+        <field id="itemSpacing" type="float" value="16" />
         <field id="action" type="string" alwaysNotify="true" />
-        <field id="playbackState" type="string" onChange="onPlaybackStateChanged" />
+        <field id="playbackState" type="string" />
         <field id="keyPressed" type="boolean" alwaysNotify="true" />
         <function name="focusControls" />
         <function name="clearFocus" />

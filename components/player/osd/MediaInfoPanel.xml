@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="MediaInfoPanel" extends="Group">
     <interface>
-        <field id="lines" type="array" onChange="onLinesChanged" />
+        <field id="lines" type="array" />
         <field id="keyPressed" type="boolean" alwaysNotify="true" />
     </interface>
     <children>

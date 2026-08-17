@@ -13,6 +13,9 @@ sub init()
 
     m.currentIndex = 2
 
+    m.top.observeField("itemSpacing", "onItemSpacingChanged")
+    m.top.observeField("playbackState", "onPlaybackStateChanged")
+
     for each btn in m.buttons
         btn.observeFieldScoped("buttonSelected", "onChildButtonSelected")
     end for
@@ -60,7 +63,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
 
-        return false ' bubble up so LeftControls can take focus
+        return false ' bubble up so OptionControls can take focus
     end if
 
     return false
