@@ -5,12 +5,11 @@
     <interface>
         <field id="videoId" type="string" />
         <field id="trickplay" type="assocarray" />
+        <field id="resumePosition" type="float" value="0" />
         <field id="duration" type="float" />
         <field id="previewPosition" type="float" />
         <field id="isSeeking" type="boolean" />
-        <field id="posterFileReady" type="boolean" alwaysNotify="true" />
-        <field id="priorityTileIndex" type="integer" value="-1" />
-        <field id="priorityTileReady" type="boolean" alwaysNotify="true" />
+        <field id="resumeTilesReady" type="boolean" alwaysNotify="true" />
     </interface>
 
     <children>

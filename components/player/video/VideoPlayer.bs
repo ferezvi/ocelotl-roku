@@ -20,8 +20,11 @@ sub init()
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
 
-    ' Trickplay is now fully encapsulated in its own component.
+    ' Trickplay is now fully encapsulated in its own component, including
+    ' its own tile preload Task. VideoPlayer only feeds it inputs and reacts
+    ' to resumeTilesReady to know when it's safe to start playback.
     m.trickplay = m.top.findNode("trickplay")
+    m.trickplay.observeField("resumeTilesReady", "onTrickplayResumeTilesReady")
     m.videoOsd.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
     m.videoOsd.observeField("isSeeking", "onTrickplaySeekingChanged")
 
@@ -64,20 +67,6 @@ sub init()
     m.loadContentTask.control = TaskControl.RUN
 
     ' --------------------------------------------------------
-    ' Trickplay image cache.
-    ' --------------------------------------------------------
-
-    m.preloadTrickplayImagesTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
-    m.preloadTrickplayImagesTask.videoID = currentItem.id
-    ' Forwards to Trickplay once tile 0 is confirmed on disk.
-    m.preloadTrickplayImagesTask.observeField("firstTileReady", "onFirstTrickplayTileReady")
-    ' Gates VideoControl.PLAY on resume, until the resume-position tile is ready.
-    m.preloadTrickplayImagesTask.observeField("priorityTilesReady", "onPriorityTrickplayTilesReady")
-    m.top.appendChild(m.preloadTrickplayImagesTask)
-
-    m.waitingForPriorityTrickplay = false
-
-    ' --------------------------------------------------------
     ' Playback reporting.
     ' --------------------------------------------------------
 
@@ -88,14 +77,6 @@ sub init()
     centerSpinnerPercentLabel()
 
     m.top.setFocus(true)
-end sub
-
-sub onFirstTrickplayTileReady()
-    if not m.preloadTrickplayImagesTask.firstTileReady
-        return
-    end if
-
-    m.trickplay.posterFileReady = true
 end sub
 
 sub onTrickplayPreviewPositionChanged()
@@ -133,76 +114,21 @@ sub onVideoContentLoaded()
     ' --------------------------------------------------------
     ' Trickplay
     ' --------------------------------------------------------
+    ' Trickplay owns its own tile preload lifecycle (Task creation, the
+    ' two-pass resume strategy, cache cleanup for the previous video).
+    ' VideoPlayer only feeds inputs and waits on resumeTilesReady below.
+
+    resumePosition = 0
+
+    if isValid(item.content) and isValid(item.content.PlayStart)
+        resumePosition = item.content.PlayStart
+    end if
+
+    m.waitingForPriorityTrickplay = (resumePosition > 0)
 
     m.trickplay.videoId = item.id
+    m.trickplay.resumePosition = resumePosition
     m.trickplay.trickplay = item.trickplay
-
-    ' --------------------------------------------------------
-    ' Remove previous video's cached trickplay tiles.
-    ' --------------------------------------------------------
-
-    if isValid(m.currentTrickplayVideoId) and m.currentTrickplayVideoId <> ""
-        m.preloadTrickplayImagesTask.videoID = m.currentTrickplayVideoId
-        m.preloadTrickplayImagesTask.method = "REMOVE"
-        m.preloadTrickplayImagesTask.control = TaskControl.RUN
-    end if
-
-    ' --------------------------------------------------------
-    ' Cache current video's trickplay tiles.
-    ' --------------------------------------------------------
-
-    trickplayDataFinal = invalid
-
-    if isValidAndNotEmpty(item.trickplay)
-        trickplayData = item.trickplay.LookupCI(item.id)
-
-        if isValidAndNotEmpty(trickplayData)
-            keys = trickplayData.keys()
-
-            if keys.count() > 0
-                trickplayDataFinal = trickplayData.lookupCI(keys[0])
-            end if
-        end if
-    end if
-
-    if isValidAndNotEmpty(trickplayDataFinal)
-        thumbnailsPerTile = trickplayDataFinal.TileHeight * trickplayDataFinal.TileWidth
-
-        if thumbnailsPerTile > 0
-            ' Reset before restarting the task, so a stale "true" from
-            ' a previous video isn't mistaken for this one's readiness.
-            m.trickplay.posterFileReady = false
-
-            resumeSeconds = 0
-            if isValid(item.content) and isValid(item.content.PlayStart)
-                resumeSeconds = item.content.PlayStart
-            end if
-
-            maxTileIndex = fix((trickplayDataFinal.ThumbnailCount - 1) / thumbnailsPerTile)
-            priorityTileIndex = -1
-
-            if resumeSeconds > 0 and isValid(trickplayDataFinal.Interval) and trickplayDataFinal.Interval > 0
-                iconInterval = trickplayDataFinal.Interval / 1000
-                iconIndex = fix(resumeSeconds / iconInterval)
-                priorityTileIndex = fix(iconIndex / thumbnailsPerTile)
-
-                if priorityTileIndex > maxTileIndex
-                    priorityTileIndex = maxTileIndex
-                end if
-            end if
-
-            m.preloadTrickplayImagesTask.videoID = item.id
-            m.preloadTrickplayImagesTask.numImagesToLoad = maxTileIndex
-            m.preloadTrickplayImagesTask.trickplayWidth = trickplayDataFinal.Width
-            m.preloadTrickplayImagesTask.priorityTileIndex = priorityTileIndex
-            m.preloadTrickplayImagesTask.method = "ADD"
-            m.preloadTrickplayImagesTask.control = TaskControl.RUN
-            m.waitingForPriorityTrickplay = (priorityTileIndex >= 0)
-            m.priorityTileIndexForTrickplay = priorityTileIndex
-        end if
-    end if
-
-    m.currentTrickplayVideoId = item.id
 
     ' --------------------------------------------------------
     ' Video playback fields.
@@ -293,14 +219,9 @@ sub onVideoContentLoaded()
     end if
 end sub
 
-sub onPriorityTrickplayTilesReady()
-    if not m.preloadTrickplayImagesTask.priorityTilesReady
+sub onTrickplayResumeTilesReady()
+    if not m.trickplay.resumeTilesReady
         return
-    end if
-
-    if isValid(m.priorityTileIndexForTrickplay) and m.priorityTileIndexForTrickplay > 0
-        m.trickplay.priorityTileIndex = m.priorityTileIndexForTrickplay
-        m.trickplay.priorityTileReady = true
     end if
 
     beginDeferredPlayback()

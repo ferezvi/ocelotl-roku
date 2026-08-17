@@ -1,4 +1,5 @@
 import "pkg:/source/utils/misc.bs"
+import "pkg:/source/enums/TaskControl.bs"
 
 ' ============================================================
 ' CONSTANTS
@@ -52,21 +53,29 @@ sub init()
 
     m.iconInterval = 0
 
+    m.trickplayPriorityTileIndex = -1
+    m.currentPreloadVideoId = ""
+
     for each trickplayImage in m.trickplayImages
         trickplayImage.visible = false
         trickplayImage.observeField("loadStatus", "onTrickplayImageLoadStatusChanged")
     end for
 
-    m.top.observeField("videoId", "onTrickplayDataChanged")
+    ' Only "trickplay" triggers the parse. VideoPlayer always sets videoId
+    ' and resumePosition before trickplay, so by the time this fires both
+    ' are already consistent - observing videoId separately here would
+    ' double-fire onTrickplayDataChanged with half-updated state.
     m.top.observeField("trickplay", "onTrickplayDataChanged")
     m.top.observeField("duration", "onTrickplayDurationChanged")
     m.top.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
     m.top.observeField("isSeeking", "onTrickplaySeekingChanged")
-    ' Set by PlayerView once PreloadTrickplayImagesTask confirms tile 0
-    ' has been written to tmp:/. Only then is it safe to preload the poster.
-    m.top.observeField("posterFileReady", "onTrickplayPosterFileReady")
-    ' Set by PlayerView once the resume-position tile is confirmed on disk.
-    m.top.observeField("priorityTileReady", "onTrickplayPriorityTileReady")
+
+    ' Trickplay tile preload is now fully owned here - VideoPlayer only
+    ' feeds videoId/trickplay/resumePosition and reads resumeTilesReady.
+    m.preloadTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
+    m.preloadTask.observeField("firstTileReady", "onFirstTileReady")
+    m.preloadTask.observeField("priorityTilesReady", "onPriorityTilesReady")
+    m.top.appendChild(m.preloadTask)
 end sub
 
 ' ============================================================
@@ -115,17 +124,25 @@ sub onTrickplayDataChanged()
     m.trickplayPosterPreloadStarted = false
     m.trickplayPosterPreloadReady = false
     m.trickplayPriorityPreloadStarted = false
-    trickplay = m.top.trickplay
-
-    if not isValidAndNotEmpty(trickplay)
-        resetTrickplayBuffers()
-        return
-    end if
+    m.trickplayPriorityTileIndex = -1
 
     videoId = m.top.videoId
 
     if not isValidAndNotEmpty(videoId)
         resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    ' Cleans up the previous video's cached tiles and updates tracking,
+    ' regardless of whether this video's own trickplay data turns out valid.
+    removePreviousTrickplayCache(videoId)
+
+    trickplay = m.top.trickplay
+
+    if not isValidAndNotEmpty(trickplay)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
         return
     end if
 
@@ -133,6 +150,7 @@ sub onTrickplayDataChanged()
 
     if not isValidAndNotEmpty(trickplayData)
         resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
         return
     end if
 
@@ -140,6 +158,7 @@ sub onTrickplayDataChanged()
 
     if keys.count() = 0
         resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
         return
     end if
 
@@ -147,11 +166,13 @@ sub onTrickplayDataChanged()
 
     if not isValidAndNotEmpty(m.trickplayDataFinal)
         resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
         return
     end if
 
     if not isValid(m.trickplayDataFinal.Interval)
         resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
         return
     end if
 
@@ -159,8 +180,65 @@ sub onTrickplayDataChanged()
 
     resetTrickplayBuffers()
 
-    ' Poster preload no longer starts here. It waits for posterFileReady,
-    ' set by PlayerView once tile 0 is confirmed on disk (see onTrickplayPosterFileReady).
+    ' Poster preload no longer starts here. It waits for the preload
+    ' task's firstTileReady (see onFirstTileReady).
+    startTrickplayPreload(videoId, m.trickplayDataFinal)
+end sub
+
+' Issues a REMOVE for the previously cached video's tiles (if different from
+' the one loading now) and updates tracking. Runs unconditionally, even if
+' the new video's own trickplay data later turns out invalid.
+sub removePreviousTrickplayCache(videoId as string)
+    if isValidAndNotEmpty(m.currentPreloadVideoId) and m.currentPreloadVideoId <> videoId
+        m.preloadTask.videoID = m.currentPreloadVideoId
+        m.preloadTask.method = "REMOVE"
+        m.preloadTask.control = TaskControl.RUN
+    end if
+
+    m.currentPreloadVideoId = videoId
+end sub
+
+' Computes the resume-position priority tile (two-pass preload strategy)
+' and kicks off the ADD pass. Guarded against the double-fire that can
+' still happen on the very first load, when trickplay changes before
+' videoId settles.
+sub startTrickplayPreload(videoId as string, data as object)
+    if m.trickplayPreloadStartedFor = videoId
+        return
+    end if
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    m.trickplayPreloadStartedFor = videoId
+
+    maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
+    priorityTileIndex = -1
+
+    resumePosition = m.top.resumePosition
+
+    if resumePosition > 0 and isValid(data.Interval) and data.Interval > 0
+        iconInterval = data.Interval / 1000
+        iconIndex = fix(resumePosition / iconInterval)
+        priorityTileIndex = fix(iconIndex / thumbnailsPerTile)
+
+        if priorityTileIndex > maxTileIndex
+            priorityTileIndex = maxTileIndex
+        end if
+    end if
+
+    m.trickplayPriorityTileIndex = priorityTileIndex
+
+    m.preloadTask.videoID = videoId
+    m.preloadTask.numImagesToLoad = maxTileIndex
+    m.preloadTask.trickplayWidth = data.Width
+    m.preloadTask.priorityTileIndex = priorityTileIndex
+    m.preloadTask.method = "ADD"
+    m.preloadTask.control = TaskControl.RUN
 end sub
 
 ' ============================================================
@@ -196,12 +274,16 @@ sub configureTrickplayImageForPreload(image as object, data as object)
 end sub
 
 
-sub onTrickplayPriorityTileReady()
-    if not m.top.priorityTileReady
+sub onPriorityTilesReady()
+    if not m.preloadTask.priorityTilesReady
         return
     end if
 
     preloadPriorityTrickplayTile()
+
+    ' Always notify, even when there was nothing to prioritize, so
+    ' VideoPlayer's deferred-playback wait never hangs.
+    m.top.resumeTilesReady = true
 end sub
 
 
@@ -214,7 +296,7 @@ sub preloadPriorityTrickplayTile()
         return
     end if
 
-    tileIndex = m.top.priorityTileIndex
+    tileIndex = m.trickplayPriorityTileIndex
 
     ' Tile 0 is already covered by the poster preload in buffer 0.
     if tileIndex <= 0
@@ -250,8 +332,8 @@ end sub
 ' INVISIBLE POSTER PRELOAD
 ' ============================================================
 
-sub onTrickplayPosterFileReady()
-    if not m.top.posterFileReady
+sub onFirstTileReady()
+    if not m.preloadTask.firstTileReady
         return
     end if
 
