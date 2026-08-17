@@ -4,6 +4,7 @@ import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/misc.bs"
+import "pkg:/components/player/video/PlaybackReporter.bs"
 
 const SEEK_SECONDS = 10
 const SKIP_SECONDS = 30
@@ -70,9 +71,7 @@ sub init()
     ' Playback reporting.
     ' --------------------------------------------------------
 
-    m.playbackTimer = m.top.findNode("playbackTimer")
-    m.playbackTimer.observeField("fire", "ReportPlayback")
-    m.playReported = false
+    initPlaybackReporter()
 
     centerSpinnerPercentLabel()
 
@@ -273,67 +272,7 @@ sub onStateChanged()
         m.spinnerPercentLabel.visible = false
     end if
 
-    ' --------------------------------------------------------
-    ' Playback reporting.
-    ' --------------------------------------------------------
-
-    if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
-        if not m.playReported
-            ReportPlayback("start")
-            m.playReported = true
-        else
-            ReportPlayback()
-        end if
-
-        m.playbackTimer.control = "start"
-
-    else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED)
-        m.playbackTimer.control = "stop"
-        ReportPlayback()
-
-    else if isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
-        m.playbackTimer.control = "stop"
-
-        if m.playReported
-            ReportPlayback("stop")
-            m.playReported = false
-        end if
-
-    else if isStringEqual(m.top.state, MediaPlaybackState.FINISHED)
-        m.playbackTimer.control = "stop"
-        ReportPlayback("stop")
-        m.playReported = false
-    end if
-end sub
-
-' ============================================================
-' PLAYBACK REPORTING
-' ============================================================
-
-sub ReportPlayback(state = "update" as string)
-    if m.top.position = invalid
-        return
-    end if
-
-    params = {
-        "ItemId": m.top.id,
-        "PlaySessionId": m.top.PlaySessionId,
-        "PositionTicks": int(m.top.position) * 10000000&,
-        "IsPaused": isStringEqual(m.top.state, MediaPlaybackState.PAUSED)
-    }
-
-    playstateTask = m.global.playstateTask
-
-    if not isValid(playstateTask)
-        return
-    end if
-
-    playstateTask.setFields({
-        status: state,
-        params: params
-    })
-
-    playstateTask.control = TaskControl.RUN
+    reportPlaybackStateChanged()
 end sub
 
 ' ============================================================
