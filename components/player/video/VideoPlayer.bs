@@ -1,10 +1,11 @@
+import "pkg:/components/player/video/AudioTrackHandler.bs"
+import "pkg:/components/player/video/PlaybackReporter.bs"
+import "pkg:/components/player/video/VideoInputHandler.bs"
 import "pkg:/source/enums/MediaPlaybackState.bs"
 import "pkg:/source/enums/SubtitleSelection.bs"
 import "pkg:/source/enums/TaskControl.bs"
 import "pkg:/source/enums/VideoControl.bs"
 import "pkg:/source/utils/misc.bs"
-import "pkg:/components/player/video/PlaybackReporter.bs"
-import "pkg:/components/player/video/VideoInputHandler.bs"
 
 ' ============================================================
 ' LIFECYCLE
@@ -69,7 +70,7 @@ sub init()
     ' --------------------------------------------------------
 
     initPlaybackReporter()
-
+    initAudioTrackHandler()
     centerSpinnerPercentLabel()
 
     m.top.setFocus(true)
@@ -313,43 +314,6 @@ end sub
 ' AUDIO TRACK SELECTION
 ' ============================================================
 
-sub onAvailableAudioTracksChanged()
-    if not isValidAndNotEmpty(m.top.availableAudioTracks)
-        return
-    end if
-
-    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
-
-    for each audioTrack in m.top.availableAudioTracks
-        trackName = audioTrack.LookupCI("name")
-
-        if isStringEqual(trackName, preferredAudioTrackName)
-            rokuTrackString = audioTrack.LookupCI("Track")
-            rokuTrackIndex = rokuTrackString.toint()
-
-            m.global.queueManager.callFunc("setPreferredAudioTrackIndex", rokuTrackIndex)
-            m.top.audioIndex = rokuTrackIndex
-
-            if m.top.currentAudioTrack = rokuTrackString
-                return
-            end if
-
-            if m.top.position <> 0
-                m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
-            end if
-
-            m.top.control = VideoControl.STOP
-
-            m.loadContentTask.selectedAudioStreamIndex = m.top.audioIndex
-            m.loadContentTask.itemId = m.top.id
-            m.loadContentTask.observeField("content", "onVideoContentLoaded")
-            m.loadContentTask.control = TaskControl.RUN
-
-            exit for
-        end if
-    end for
-end sub
-
 sub onTrackSelected()
     selection = m.videoOsd.trackSelected
 
@@ -365,25 +329,6 @@ sub onTrackSelected()
         m.top.SelectedSubtitle = selection.index
         m.loadContentTask.selectedSubtitleIndex = selection.index
     end if
-end sub
-
-sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
-    m.top.selectedAudioIndex = jellyfinIndex
-
-    if desiredIndex = m.top.audioIndex
-        return
-    end if
-
-    if m.top.position <> 0
-        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
-    end if
-
-    m.top.control = VideoControl.STOP
-
-    m.loadContentTask.selectedAudioStreamIndex = desiredIndex
-    m.loadContentTask.itemId = m.top.id
-    m.loadContentTask.observeField("content", "onVideoContentLoaded")
-    m.loadContentTask.control = TaskControl.RUN
 end sub
 
 ' ============================================================
