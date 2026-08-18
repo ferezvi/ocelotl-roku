@@ -34,8 +34,12 @@ sub onAvailableAudioTracksChanged()
                 return
             end if
 
-            reloadWithAudioIndex(rokuTrackIndex)
-
+            ' Native in-place switch: the container already has this track
+            ' (that's how availableAudioTracks got populated with a name
+            ' match in the first place), so no need to STOP and reload
+            ' the whole content task — that just causes an unnecessary
+            ' rebuffer/restart from the beginning.
+            m.top.audioTrack = rokuTrackString
             exit for
         end if
     end for
