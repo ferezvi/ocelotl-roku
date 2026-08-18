@@ -84,6 +84,7 @@ sub onTrickplaySeekingChanged()
     m.trickplay.isSeeking = m.videoOsd.isSeeking
 
     if m.videoOsd.isSeeking
+        m.trickplay.visible = true
         m.trickplay.previewPosition = m.videoOsd.previewPosition
     end if
 end sub
@@ -337,6 +338,7 @@ end sub
 
 sub onOSDVisibilityChanged()
     if not m.videoOsd.visible
+        m.trickplay.visible = false
         m.top.setFocus(true)
     end if
 end sub
