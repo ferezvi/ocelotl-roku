@@ -3,6 +3,9 @@
         <field id="barUri" type="uri" value="pkg:/images/ui/player/progress_bar_$$RES$$.9.png" onChange="onBarUriChanged" />
         <field id="trackColor" type="color" value="0xFFFFFF33" />
         <field id="fillColor" type="color" value="0x7C3AEDFF" />
+        <field id="focusedTrackColor" type="color" value="0xFFFFFF66" onChange="onLayoutFieldsChanged" />
+        <field id="focusedFillColor" type="color" value="0x9D5CF5FF" onChange="onLayoutFieldsChanged" />
+        <field id="focused" type="boolean" value="false" onChange="onLayoutFieldsChanged" />
         <field id="trackWidth" type="float" value="1714" onChange="onLayoutFieldsChanged" />
         <field id="trackHeight" type="float" value="12" onChange="onLayoutFieldsChanged" />
         <field id="previewFillColor" type="color" value="0x7C3AEDB3" onChange="onLayoutFieldsChanged" />

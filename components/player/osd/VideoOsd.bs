@@ -383,17 +383,20 @@ end function
 
 sub focusControls()
     m.optionControls.callFunc("clearFocus")
+    m.progressBar.focused = false
     m.videoControls.callFunc("focusControls")
 end sub
 
 sub focusProgressBar()
     m.videoControls.callFunc("clearFocus")
     m.optionControls.callFunc("clearFocus")
+    m.progressBar.focused = true
     m.progressBar.setFocus(true)
 end sub
 
 sub focusOptionControls()
     m.videoControls.callFunc("clearFocus")
+    m.progressBar.focused = false
     m.optionControls.callFunc("focusControls")
 end sub
 
@@ -413,10 +416,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if isStringEqual(key, KeyCode.UP)
         if m.videoControls.isInFocusChain()
             m.videoControls.callFunc("clearFocus")
+            m.progressBar.focused = true
             m.progressBar.setFocus(true)
             return true
 
         else if m.progressBar.hasFocus()
+            m.progressBar.focused = false
             m.progressBar.setFocus(false)
             m.optionControls.callFunc("focusControls")
             return true
@@ -425,10 +430,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if isStringEqual(key, KeyCode.DOWN)
         if m.optionControls.isInFocusChain()
             m.optionControls.callFunc("clearFocus")
+            m.progressBar.focused = true
             m.progressBar.setFocus(true)
             return true
 
         else if m.progressBar.hasFocus()
+            m.progressBar.focused = false
             m.progressBar.setFocus(false)
             m.videoControls.callFunc("focusControls")
             return true

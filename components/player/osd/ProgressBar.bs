@@ -1,3 +1,4 @@
+import "pkg:/source/enums/ColorPalette.bs"
 import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
@@ -24,6 +25,7 @@ sub init()
     m.seekRepeatTimer.repeat = true
     m.seekRepeatTimer.observeField("fire", "onSeekRepeatTimerFire")
 
+    setColors()
     onBarUriChanged()
     updateLayout()
 
@@ -181,10 +183,10 @@ end sub
 sub updateLayout()
     m.track.width = m.top.trackWidth
     m.track.height = m.top.trackHeight
-    m.track.blendColor = m.top.trackColor
-
     m.fill.height = m.top.trackHeight
-    m.fill.blendColor = m.top.fillColor
+
+    m.track.blendColor = m.top.focused ? m.top.focusedTrackColor : m.top.trackColor
+    m.fill.blendColor = m.top.focused ? m.top.focusedFillColor : m.top.fillColor
 
     m.previewForward.height = m.top.trackHeight
     m.previewForward.blendColor = m.top.previewFillColor
@@ -257,3 +259,33 @@ sub updateTimeLabels(playhead as float)
     m.remainingTime.width = m.top.trackWidth
     m.remainingTime.translation = [0, labelY]
 end sub
+
+sub onFocusChanged()
+    updateLayout()
+end sub
+
+' Pulls the user's configured cursor color (Settings > User Interface > Colors > Cursor)
+' to use as the progress bar's focused accent, falling back to the Ocelotl highlight
+' color when the user hasn't set one. The idle trackColor/fillColor stay as static
+' XML defaults - only the focused state follows the user's chosen accent.
+sub setColors()
+    accent = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+
+    m.top.fillColor = toRokuColor(accent, "80") ' idle - dimmed
+    m.top.focusedFillColor = toRokuColor(accent, "FF") ' focused - full opacity
+    m.top.focusedTrackColor = toRokuColor(ColorPalette.WHITE, "33")
+end sub
+
+' Normalizes a "#RRGGBB", "#RRGGBBAA" or "0xRRGGBB[AA]" string into the
+' "0xRRGGBBAA" format SceneGraph color fields expect, applying the given alpha.
+function toRokuColor(hex as string, alpha as string) as string
+    if Left(hex, 1) = "#"
+        hex = Right(hex, Len(hex) - 1)
+    else if Left(hex, 2) = "0x"
+        hex = Right(hex, Len(hex) - 2)
+    end if
+
+    if Len(hex) = 8 then hex = Left(hex, 6) ' strip any existing alpha channel
+
+    return "0x" + hex + alpha
+end function
