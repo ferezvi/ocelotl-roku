@@ -28,6 +28,12 @@ sub init()
     m.videoOsd.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
     m.videoOsd.observeField("isSeeking", "onTrickplaySeekingChanged")
 
+    m.skipSegmentsManager = m.top.findNode("skipSegmentsManager")
+    m.skipSegmentsManager.observeField("action", "onSkipSegmentsAction")
+    m.skipSegmentsManager.observeField("hasActiveSegment", "onSkipSegmentsActiveSegmentChanged")
+    m.skipSegmentsManager.userSettings = m.global.session.user.settings
+    m.videoOsd.skipSegmentsManager = m.skipSegmentsManager
+
     ' Player OSD events.
     m.videoOsd.observeField("trackSelected", "onTrackSelected")
     m.videoOsd.observeField("action", "onOSDAction")
@@ -82,6 +88,7 @@ end sub
 
 sub onTrickplaySeekingChanged()
     m.trickplay.isSeeking = m.videoOsd.isSeeking
+    m.skipSegmentsManager.isSeeking = m.videoOsd.isSeeking
 
     if m.videoOsd.isSeeking
         m.trickplay.visible = true
@@ -114,6 +121,9 @@ sub onVideoContentLoaded()
     end if
 
     item = videoContent[0]
+
+    m.skipSegmentsManager.mediaSegments = videoContent[0].mediaSegments
+    m.videoOsd.progressBar.mediaSegments = videoContent[0].mediaSegments
 
     ' --------------------------------------------------------
     ' Trickplay
@@ -259,6 +269,7 @@ end sub
 
 sub onStateChanged()
     m.videoOsd.playbackState = m.top.state
+    m.skipSegmentsManager.playbackState = m.top.state
 
     ' Keep custom captions synchronized with playback.
     if isValid(m.captionTask)
@@ -310,6 +321,9 @@ sub onVideoPositionChanged()
         m.videoOsd.duration = m.top.duration
 
         m.trickplay.duration = m.top.duration
+
+        m.skipSegmentsManager.position = m.top.position
+        m.skipSegmentsManager.duration = m.top.duration
     end if
 
     if isValid(m.captionTask)
@@ -370,3 +384,20 @@ function max(a as float, b as float) as float
 
     return b
 end function
+
+sub onSkipSegmentsActiveSegmentChanged()
+    m.top.hasActiveSegment = m.skipSegmentsManager.hasActiveSegment
+end sub
+
+sub onSkipSegmentsAction()
+    action = m.skipSegmentsManager.action
+    if not isValid(action) then return
+
+    if action.type = "seek"
+        m.top.seek = action.position
+    else if action.type = "nextItem"
+        ' TODO: hook into whatever queueManager/next-episode flow you
+        ' already use for end-of-content transitions.
+        m.top.backPressed = true
+    end if
+end sub

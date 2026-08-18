@@ -19,6 +19,31 @@ function onKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
+    ' Skip-segment shortcut: works even with the OSD closed, since the
+    ' skip button is implicitly "focused" whenever it's the only thing
+    ' showing over the video (no OSD/D-pad navigation needed here).
+    if isStringEqual(key, KeyCode.OK) and not m.videoOsd.visible and m.top.hasActiveSegment
+        m.skipSegmentsManager.callFunc("skipCurrentSegment")
+        return true
+    end if
+
+    ' The skip button lives outside VideoOsd's tree (so it stays visible
+    ' while the OSD is closed), so unhandled keys from it bubble up here
+    ' instead of into VideoOsd.onKeyEvent - hand LEFT/UP off to VideoOsd's
+    ' own navigation, same as it already does internally for VideoControls.
+    if m.skipSegmentsManager.isInFocusChain()
+        if isStringEqual(key, KeyCode.LEFT)
+            m.skipSegmentsManager.callFunc("clearFocus")
+            m.videoOsd.callFunc("focusControls")
+            return true
+
+        else if isStringEqual(key, KeyCode.UP)
+            m.skipSegmentsManager.callFunc("clearFocus")
+            m.videoOsd.callFunc("focusProgressBar")
+            return true
+        end if
+    end if
+
     if m.videoOsd.visible
         return false
     end if

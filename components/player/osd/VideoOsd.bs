@@ -11,6 +11,7 @@ const OSD_INACTIVITY_TIMEOUT_SECONDS = 10
 sub init()
     m.videoControls = m.top.findNode("videoControls")
     m.progressBar = m.top.findNode("progressBar")
+    m.top.progressBar = m.progressBar ' expose node so VideoPlayer can wire it to SkipSegmentsManager
     m.optionControls = m.top.findNode("optionControls")
     m.languagePanel = m.top.findNode("languagePanel")
     m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
@@ -55,6 +56,10 @@ sub init()
     m.top.appendChild(m.inactivityTimer)
 end sub
 
+sub onSkipSegmentsManagerChanged()
+    m.skipSegmentsManager = m.top.skipSegmentsManager
+end sub
+
 ' ------------------------------------------------------------
 ' Inactivity timer / OSD visibility
 ' ------------------------------------------------------------
@@ -63,6 +68,9 @@ end sub
 ' the show) and stops it once the OSD is hidden, so it doesn't fire a
 ' stray "hide" action while already hidden.
 sub onVisibleChanged()
+    if isValid(m.skipSegmentsManager)
+        m.skipSegmentsManager.osdOpen = m.top.visible
+    end if
 
     if m.top.visible
         resetInactivityTimer()
@@ -441,10 +449,17 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return true
         end if
 
+    else if isStringEqual(key, KeyCode.RIGHT) and m.videoControls.isInFocusChain()
+        if m.skipSegmentsManager.hasActiveSegment
+            m.videoControls.callFunc("clearFocus")
+            m.skipSegmentsManager.callFunc("focusSkipButton")
+        end if
+        return true ' edge of the row either way
+
     else if isStringEqual(key, KeyCode.LEFT) and (m.videoControls.isInFocusChain() or m.optionControls.isInFocusChain())
         return true ' edge of the row - no horizontal handoff between rows anymore
 
-    else if isStringEqual(key, KeyCode.RIGHT) and (m.videoControls.isInFocusChain() or m.optionControls.isInFocusChain())
+    else if isStringEqual(key, KeyCode.RIGHT) and m.optionControls.isInFocusChain()
         return true ' edge of the row - no horizontal handoff between rows anymore
 
     else if isStringEqual(key, KeyCode.BACK)

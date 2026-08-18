@@ -1,5 +1,6 @@
 <component name="ProgressBar" extends="Group">
     <interface>
+        <field id="mediaSegments" type="assocarray" onChange="onMediaSegmentsChanged" />
         <field id="barUri" type="uri" value="pkg:/images/ui/player/progress_bar_$$RES$$.9.png" onChange="onBarUriChanged" />
         <field id="trackColor" type="color" value="0xFFFFFF33" />
         <field id="fillColor" type="color" value="0x7C3AEDFF" />

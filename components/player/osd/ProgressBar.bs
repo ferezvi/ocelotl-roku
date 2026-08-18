@@ -33,6 +33,7 @@ sub init()
     m.top.observeField("duration", "onPositionChanged")
     m.top.observeField("previewPosition", "onPositionChanged")
     m.top.observeField("isSeeking", "onIsSeekingChanged")
+    m.top.observeField("mediaSegments", "onMediaSegmentsChanged")
 end sub
 
 ' Advances the preview position one step in the given direction (1 or -1),
@@ -234,6 +235,7 @@ sub updateLayout()
     end if
 
     updateTimeLabels(m.top.isSeeking ? m.top.previewPosition : m.top.position)
+    createSegmentMarkers()
 end sub
 
 function clampRatio(value as float, total as float) as float
@@ -258,10 +260,6 @@ sub updateTimeLabels(playhead as float)
     m.currentTime.translation = [0, labelY]
     m.remainingTime.width = m.top.trackWidth
     m.remainingTime.translation = [0, labelY]
-end sub
-
-sub onFocusChanged()
-    updateLayout()
 end sub
 
 ' Pulls the user's configured cursor color (Settings > User Interface > Colors > Cursor)
@@ -289,3 +287,38 @@ function toRokuColor(hex as string, alpha as string) as string
 
     return "0x" + hex + alpha
 end function
+
+sub onMediaSegmentsChanged()
+    createSegmentMarkers()
+end sub
+
+sub createSegmentMarkers()
+    ' Clear old markers only (id "SegmentMarker")
+    childCount = m.track.getChildCount()
+    for i = childCount - 1 to 0 step -1
+        child = m.track.getChild(i)
+        if isValid(child) and child.id = "SegmentMarker"
+            m.track.removeChild(child)
+        end if
+    end for
+
+    if not isValidAndNotEmpty(m.top.mediaSegments) or m.top.duration <= 0 then return
+
+    barWidth = m.top.trackWidth
+
+    for i = 0 to m.top.mediaSegments.TotalRecordCount - 1
+        startPos = cint(m.top.mediaSegments.items[i].StartTicks / 10000000)
+        endPos = cint(m.top.mediaSegments.items[i].EndTicks / 10000000)
+        markerStart = (startPos / m.top.duration) * barWidth
+        markerWidth = ((endPos / m.top.duration) * barWidth) - markerStart
+
+        marker = CreateObject("roSGNode", "Rectangle")
+        marker.id = "SegmentMarker"
+        marker.width = markerWidth
+        marker.height = m.top.trackHeight
+        marker.color = "0xFFFFFF"
+        marker.opacity = 0.5
+        marker.translation = [markerStart, 0]
+        m.track.appendChild(marker)
+    end for
+end sub

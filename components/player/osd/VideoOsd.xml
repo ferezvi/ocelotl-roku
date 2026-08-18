@@ -28,6 +28,8 @@
         <field id="audioIndex" type="integer" />
         <field id="selectedSubtitleIndex" type="integer" />
         <field id="trackSelected" type="assocarray" alwaysNotify="true" />
+        <field id="progressBar" type="node" />
+        <field id="skipSegmentsManager" type="node" onChange="onSkipSegmentsManagerChanged" />
     </interface>
 
     <children>
