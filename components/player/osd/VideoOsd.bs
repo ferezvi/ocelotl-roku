@@ -63,12 +63,21 @@ end sub
 ' the show) and stops it once the OSD is hidden, so it doesn't fire a
 ' stray "hide" action while already hidden.
 sub onVisibleChanged()
-    print "[VideoOsd] visible="; m.top.visible
 
     if m.top.visible
         resetInactivityTimer()
     else
         m.inactivityTimer.control = "stop"
+
+        ' A seek nudge (arrow key) sets isSeeking = true in ProgressBar, and
+        ' it's only ever cleared by an explicit OK (commit) or BACK (cancel)
+        ' while the bar has focus. Auto-hide (or any other path that closes
+        ' the OSD) never calls either, so isSeeking stays stuck true - which
+        ' means the next nudge's "false -> true" transition never happens,
+        ' and nothing downstream (trickplay visibility included) re-fires.
+        if m.progressBar.isSeeking
+            m.progressBar.callFunc("cancelSeek")
+        end if
     end if
 end sub
 

@@ -86,6 +86,12 @@ sub onTrickplaySeekingChanged()
     if m.videoOsd.isSeeking
         m.trickplay.visible = true
         m.trickplay.previewPosition = m.videoOsd.previewPosition
+    else
+        ' Trickplay.bs only hides its internal images/box background when
+        ' seeking ends - the container node's own visible flag was never
+        ' reset here, so it stayed "visible" (empty) indefinitely after the
+        ' first seek of the session.
+        m.trickplay.visible = false
     end if
 end sub
 

@@ -18,6 +18,7 @@
         <!-- Emitted when user confirms a seek -->
         <field id="seek" type="float" alwaysNotify="true" />
         <function name="seekStep" />
+        <function name="cancelSeek" />
     </interface>
 
     <children>
