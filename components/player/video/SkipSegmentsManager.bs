@@ -170,6 +170,8 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
+    print "[SkipSegmentsManager] key="; key
+
     if isStringEqual(key, KeyCode.OK)
         skipCurrentSegment()
         return true
