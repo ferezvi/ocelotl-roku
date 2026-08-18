@@ -7,6 +7,7 @@
         <function name="clearFocus" />
         <field id="action" type="string" alwaysNotify="true" />
         <field id="keyPressed" type="boolean" alwaysNotify="true" />
+        <field id="navigationChanged" type="boolean" alwaysNotify="true" />
     </interface>
 
     <children>

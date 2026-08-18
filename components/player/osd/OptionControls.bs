@@ -60,6 +60,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     if isStringEqual(key, KeyCode.RIGHT)
         if m.currentIndex < m.buttons.Count() - 1
+            notifyNavigationChanged()
             setFocusedIndex(m.currentIndex + 1)
             return true
         end if
@@ -68,6 +69,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     else if isStringEqual(key, KeyCode.LEFT)
         if m.currentIndex > 0
+            notifyNavigationChanged()
             setFocusedIndex(m.currentIndex - 1)
             return true
         end if
@@ -84,4 +86,9 @@ sub onChildButtonSelected(event as object)
     if event.getData() = true
         m.top.action = node.id
     end if
+end sub
+
+sub notifyNavigationChanged()
+    m.top.navigationChanged = true
+    m.top.navigationChanged = false
 end sub

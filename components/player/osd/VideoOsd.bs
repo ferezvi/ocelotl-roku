@@ -18,6 +18,7 @@ sub init()
     m.osdTop = m.top.findNode("topOSD")
     m.videoControls.observeField("action", "onVideoControlsAction")
     m.optionControls.observeField("action", "onOptionControlsAction")
+    m.optionControls.observeField("navigationChanged", "onOptionControlsNavigationChanged")
 
     m.progressBar.observeField("seek", "onProgressBarSeek")
     m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
@@ -69,6 +70,16 @@ sub onVisibleChanged()
     else
         m.inactivityTimer.control = "stop"
     end if
+end sub
+
+sub onOptionControlsNavigationChanged()
+    closeOptionPanels()
+end sub
+
+sub closeOptionPanels()
+    m.languagePanel.visible = false
+    m.mediaInfoPanel.visible = false
+    m.synopsisPanel.visible = false
 end sub
 
 sub resetInactivityTimer()
