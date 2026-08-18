@@ -34,12 +34,10 @@ sub init()
     m.videoOsd.observeField("visible", "onOSDVisibilityChanged")
 
     ' Video events.
-    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
     m.top.observeField("state", "onStateChanged")
     m.top.observeField("position", "onVideoPositionChanged")
     m.top.observeField("duration", "onVideoPositionChanged")
     m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
-    m.top.observeField("allowCaptions", "onAllowCaptionsChange")
 
     stopLoadingSpinner()
 
