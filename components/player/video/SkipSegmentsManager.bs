@@ -13,7 +13,6 @@ sub init()
     m.mediaSegmentDismissed = {}
 
     m.top.observeField("position", "onPositionChanged")
-    m.top.observeField("mediaSegments", "onMediaSegmentsChanged")
     m.top.observeField("playbackState", "onPlaybackStateChanged")
     m.top.observeField("osdOpen", "onOsdOpenChanged")
 
@@ -169,8 +168,6 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
-
-    print "[SkipSegmentsManager] key="; key
 
     if isStringEqual(key, KeyCode.OK)
         skipCurrentSegment()

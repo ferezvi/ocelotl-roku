@@ -19,6 +19,7 @@ sub init()
 
     m.seekHoldCount = 0
     m.seekDirection = 0
+    m.segmentMarkerDuration = -1
 
     m.seekRepeatTimer = CreateObject("roSGNode", "Timer")
     m.seekRepeatTimer.duration = 0.5
@@ -168,13 +169,19 @@ end sub
 
 sub onLayoutFieldsChanged()
     updateLayout()
+    createSegmentMarkers()
 end sub
 
 sub onPositionChanged()
     if not m.top.isSeeking
         m.top.previewPosition = m.top.position
     end if
+
     updateLayout()
+
+    if m.segmentMarkerDuration <> m.top.duration
+        createSegmentMarkers()
+    end if
 end sub
 
 sub onIsSeekingChanged()
@@ -235,7 +242,6 @@ sub updateLayout()
     end if
 
     updateTimeLabels(m.top.isSeeking ? m.top.previewPosition : m.top.position)
-    createSegmentMarkers()
 end sub
 
 function clampRatio(value as float, total as float) as float
@@ -302,6 +308,8 @@ sub createSegmentMarkers()
         end if
     end for
 
+    m.segmentMarkerDuration = -1
+
     if not isValidAndNotEmpty(m.top.mediaSegments) or m.top.duration <= 0 then return
 
     barWidth = m.top.trackWidth
@@ -309,6 +317,7 @@ sub createSegmentMarkers()
     for i = 0 to m.top.mediaSegments.TotalRecordCount - 1
         startPos = cint(m.top.mediaSegments.items[i].StartTicks / 10000000)
         endPos = cint(m.top.mediaSegments.items[i].EndTicks / 10000000)
+
         markerStart = (startPos / m.top.duration) * barWidth
         markerWidth = ((endPos / m.top.duration) * barWidth) - markerStart
 
@@ -319,6 +328,9 @@ sub createSegmentMarkers()
         marker.color = "0xFFFFFF"
         marker.opacity = 0.5
         marker.translation = [markerStart, 0]
+
         m.track.appendChild(marker)
     end for
+
+    m.segmentMarkerDuration = m.top.duration
 end sub
