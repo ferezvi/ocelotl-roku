@@ -89,7 +89,7 @@ sub displaySegmentSkipButton(segmentType as string, endticks as double)
     end if
 
     m.skipButton.visible = true
-    m.skipButton.text = tr("Skip")
+    m.skipButton.text = tr(`Skip ${segmentType}`)
     updateSkipButtonFocusStyle()
 end sub
 

@@ -391,13 +391,24 @@ end sub
 
 sub onSkipSegmentsAction()
     action = m.skipSegmentsManager.action
+
     if not isValid(action) then return
 
     if action.type = "seek"
         m.top.seek = action.position
     else if action.type = "nextItem"
-        ' TODO: hook into whatever queueManager/next-episode flow you
-        ' already use for end-of-content transitions.
-        m.top.backPressed = true
+        playNextQueueItem()
     end if
+end sub
+
+sub playNextQueueItem()
+    if m.global.queueManager.callFunc("getPosition") >=
+        m.global.queueManager.callFunc("getCount") - 1
+        return
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.global.sceneManager.callFunc("clearPreviousScene")
+    m.global.queueManager.callFunc("moveForward")
+    m.global.queueManager.callFunc("playQueue")
 end sub
