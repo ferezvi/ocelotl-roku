@@ -1,4 +1,5 @@
 import "pkg:/components/player/video/AudioTrackHandler.bs"
+import "pkg:/components/player/video/BufferHandler.bs"
 import "pkg:/components/player/video/PlaybackReporter.bs"
 import "pkg:/components/player/video/SubtitleHandler.bs"
 import "pkg:/components/player/video/VideoInputHandler.bs"
@@ -77,6 +78,7 @@ sub init()
     initPlaybackReporter()
     initAudioTrackHandler()
     initSubtitleHandler()
+    initBufferHandler()
     centerSpinnerPercentLabel()
 
     m.top.setFocus(true)
@@ -150,6 +152,8 @@ sub onVideoContentLoaded()
 
     m.top.PlaySessionId = item.PlaySessionId
     m.top.videoId = item.id
+    m.playbackSanityChecked = false
+    m.runtimeticks = item.runtimeticks
     m.top.container = item.container
     m.top.mediaSourceId = item.mediaSourceId
     m.top.fullSubtitleData = item.fullSubtitleData
@@ -287,6 +291,8 @@ sub onStateChanged()
         m.playerSpinner.visible = false
         m.spinnerPercentLabel.visible = false
     end if
+
+    onBufferStateChanged()
 
     reportPlaybackStateChanged()
 end sub

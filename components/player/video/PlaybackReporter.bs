@@ -62,6 +62,21 @@ sub ReportPlayback(state = "update" as string)
         "IsPaused": isStringEqual(m.top.state, MediaPlaybackState.PAUSED)
     }
 
+    ' Live TV isn't implemented yet in Ocelotl - this branch is inert
+    ' today but keeps parity with upstream for when it lands.
+    if isValid(m.top.content) and isValid(m.top.content.live) and m.top.content.live
+        params.append({
+            "MediaSourceId": m.top.transcodeParams.MediaSourceId,
+            "LiveStreamId": m.top.transcodeParams.LiveStreamId
+        })
+        m.bufferCheckTimer.duration = 30
+    end if
+
+    if inArray(["stop", "finished"], state) and isValid(m.originalClosedCaptionState)
+        m.top.globalCaptionMode = m.originalClosedCaptionState
+        m.originalClosedCaptionState = invalid
+    end if
+
     playstateTask = m.global.playstateTask
 
     if not isValid(playstateTask)

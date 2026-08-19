@@ -40,6 +40,9 @@
     </interface>
 
     <children>
+        <timer id="bufferCheckTimer" duration="30" />
+        <timer id="bufferStuckTimer" repeat="true" duration="10" />
+        <timer id="playbackSanityTimer" duration="8" />
         <timer id="playbackTimer" repeat="true" duration="30" />
         <Group id="captionGroup" translation="[0,0]" />
         <Trickplay id="trickplay" />

@@ -1,0 +1,242 @@
+import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/PlaybackMethod.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' BUFFER HANDLER
+' ============================================================
+' Plain BrightScript module, imported into VideoPlayer.bs - runs in
+' VideoPlayer's own `m` scope, same convention as PlaybackReporter.bs
+' and SubtitleHandler.bs.
+'
+' Owns:
+'  - stall detection while buffering, with retry backoff (seek back to
+'    current position and re-play)
+'  - detection of buffering stuck at 100% -> escalating transcode fallback
+'  - post-load sanity checks (duration mismatch, playback never started)
+'    that also escalate transcode fallback
+'
+' Expects m.top, m.loadContentTask, m.global.queueManager to be
+' available before init, same as the other handlers.
+
+' NOTE: verify REPLAY_RETRIES / ACCEPTED_DURATION_DELTA aren't already
+' declared elsewhere (enums, misc.bs) before merging - BrightScript
+' will fail to compile on duplicate top-level consts.
+const REPLAY_RETRIES = 3
+const ACCEPTED_DURATION_DELTA = 5 ' seconds
+
+sub initBufferHandler()
+    m.playbackRetries = 0
+    m.bufferPercentage = 0
+    m.buffer100Count = 0
+    m.lastBufferError = 0
+    m.playbackTestComplete = false
+    m.playbackSanityChecked = false
+
+    m.bufferCheckTimer = m.top.findNode("bufferCheckTimer")
+    m.bufferCheckTimer.observeField("fire", "onBufferCheckTimerFire")
+
+    m.bufferStuckTimer = m.top.findNode("bufferStuckTimer")
+    m.bufferStuckTimer.observeField("fire", "onBufferStuckTimerFire")
+
+    m.playbackSanityTimer = m.top.findNode("playbackSanityTimer")
+    m.playbackSanityTimer.observeField("fire", "onPlaybackSanityTimerFire")
+end sub
+
+sub onBufferCheckTimerFire()
+    bufferCheck()
+end sub
+
+sub onBufferStuckTimerFire()
+    bufferStuckAt100Check()
+end sub
+
+' ------------------------------------------------------------
+' Stall detection + retry backoff
+' ------------------------------------------------------------
+sub bufferCheck()
+    if not isStringEqual(m.top.state, MediaPlaybackState.BUFFERING)
+        m.bufferCheckTimer.control = "stop"
+        return
+    end if
+
+    if not isValid(m.top.bufferingStatus) then return
+
+    percentage = m.top.bufferingStatus["percentage"]
+
+    if isValid(percentage) and percentage > m.bufferPercentage
+        m.bufferPercentage = percentage
+
+        if m.playbackRetries > 0
+            m.playbackRetries = 0
+            m.bufferCheckTimer.duration = 30
+        end if
+        return
+    end if
+
+    if isValid(m.top.content) and isValid(m.top.content.live) and m.top.content.live
+        m.top.callFunc("refresh")
+        return
+    end if
+
+    currentTime = CreateObject("roDateTime").AsSeconds()
+
+    if m.playbackRetries > 0 and (currentTime - m.lastBufferError) > 30
+        m.playbackRetries = 0
+        m.bufferCheckTimer.duration = 30
+    end if
+
+    if m.playbackRetries < REPLAY_RETRIES
+        m.playbackRetries = m.playbackRetries + 1
+        m.lastBufferError = currentTime
+        m.bufferCheckTimer.duration = 30 + (m.playbackRetries * 15)
+
+        currentPosition = m.top.position
+        m.top.control = VideoControl.STOP
+        m.top.seek = currentPosition
+        m.top.control = VideoControl.PLAY
+    else
+        showPlaybackErrorDialog(tr("There was an error retrieving the data for this item from the server."))
+        m.top.control = VideoControl.STOP
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Buffering stuck at 100% -> escalate transcode fallback
+' ------------------------------------------------------------
+sub bufferStuckAt100Check()
+    if not isStringEqual(m.top.state, MediaPlaybackState.BUFFERING)
+        m.buffer100Count = 0
+        m.bufferStuckTimer.control = "stop"
+        return
+    end if
+
+    bufferingPercent = chainLookupReturn(m.top.bufferingStatus, "percentage", 0)
+    if bufferingPercent <> 100 then return
+
+    if m.buffer100Count >= 1
+        if m.top.isTranscoded then return
+
+        m.buffer100Count = 0
+        m.bufferStuckTimer.control = "stop"
+
+        escalateTranscodeFallback(tr("Roku's video player got stuck buffering video"))
+
+        m.top.control = VideoControl.STOP
+        m.loadContentTask.mustTranscode = true
+        m.loadContentTask.observeField("content", "onVideoContentLoaded")
+        m.loadContentTask.control = TaskControl.RUN
+        return
+    end if
+
+    m.buffer100Count = m.buffer100Count + 1
+end sub
+
+' ------------------------------------------------------------
+' Post-load sanity checks
+' ------------------------------------------------------------
+sub playbackFailureTest()
+    if not isValid(m.runtimeticks) or not isValid(m.top.duration)
+        m.playbackTestComplete = true
+        return
+    end if
+
+    runtimeSeconds = m.runtimeticks / 10000000&
+
+    if Abs(m.top.duration - runtimeSeconds) < ACCEPTED_DURATION_DELTA
+        m.playbackTestComplete = true
+        return
+    end if
+
+    escalateTranscodeFallback(tr("Roku thought it could direct play this media, but the playback duration was incorrect."))
+
+    if isStringEqual(PlaybackMethod.FORCETRANSCODEDISABLEREMUX, m.global.queueManager.callFunc("getForceTranscode"))
+        m.playbackTestComplete = true
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.mustTranscode = true
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub
+
+sub playbackCheck()
+    if isValid(m.top.position) and m.top.position > 0 then return
+    if m.top.isTranscoded then return
+
+    escalateTranscodeFallback(tr("Roku thought it could direct play this media, but playback never started."))
+
+    m.top.control = VideoControl.STOP
+    m.loadContentTask.mustTranscode = true
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub
+
+' ------------------------------------------------------------
+' Shared escalation step (allow remux -> disable remux), used by
+' bufferStuckAt100Check / playbackFailureTest / playbackCheck.
+' ------------------------------------------------------------
+sub escalateTranscodeFallback(reason as string)
+    currentForceTranscode = m.global.queueManager.callFunc("getForceTranscode")
+
+    if isStringEqual(PlaybackMethod.PLAYNORMALLY, currentForceTranscode)
+        m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEALLOWREMUX)
+    else if isStringEqual(PlaybackMethod.FORCETRANSCODEALLOWREMUX, currentForceTranscode)
+        m.global.queueManager.callFunc("setForceTranscode", PlaybackMethod.FORCETRANSCODEDISABLEREMUX)
+    end if
+
+    m.global.queueManager.callFunc("setTranscodeReason", reason)
+end sub
+
+' ------------------------------------------------------------
+' Error dialog (ported from VideoPlayerView.bs)
+' ------------------------------------------------------------
+sub showPlaybackErrorDialog(errorMessage as string)
+    dialog = createObject("roSGNode", "Dialog")
+    dialog.title = tr("Error During Playback")
+    dialog.buttons = [tr("OK")]
+    dialog.message = errorMessage
+    dialog.observeField("buttonSelected", "onPlaybackErrorButtonSelected")
+    dialog.observeField("wasClosed", "onPlaybackErrorDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onPlaybackErrorButtonSelected(msg)
+    sourceNode = msg.getRoSGNode()
+    sourceNode.close = true
+end sub
+
+sub onPlaybackErrorDialogClosed(msg)
+    sourceNode = msg.getRoSGNode()
+    sourceNode.unobserveField("buttonSelected")
+    sourceNode.unobserveField("wasClosed")
+
+    m.global.sceneManager.callFunc("popScene")
+end sub
+
+sub onBufferStateChanged()
+    if isStringEqual(m.top.state, MediaPlaybackState.BUFFERING)
+        m.bufferCheckTimer.control = "start"
+        m.bufferStuckTimer.control = "start"
+        return
+    end if
+
+    m.bufferCheckTimer.control = "stop"
+    m.bufferStuckTimer.control = "stop"
+    m.buffer100Count = 0
+
+    ' First time we reach PLAYING for this content load, run the
+    ' post-load sanity checks once, after giving the player a moment
+    ' to actually settle into real playback.
+    if isStringEqual(m.top.state, MediaPlaybackState.PLAYING) and not m.playbackSanityChecked
+        m.playbackSanityChecked = true
+        m.playbackSanityTimer.control = "start"
+    end if
+end sub
+
+sub onPlaybackSanityTimerFire()
+    playbackCheck()
+    playbackFailureTest()
+end sub
