@@ -299,12 +299,14 @@ sub onMediaSegmentsChanged()
 end sub
 
 sub createSegmentMarkers()
-    ' Clear old markers only (id "SegmentMarker")
-    childCount = m.track.getChildCount()
+    ' Clear old markers only (id "SegmentMarker"). Markers live directly under
+    ' m.top (not m.track) so they render on top of track/fill/preview layers -
+    ' otherwise fill's color would paint over them.
+    childCount = m.top.getChildCount()
     for i = childCount - 1 to 0 step -1
-        child = m.track.getChild(i)
+        child = m.top.getChild(i)
         if isValid(child) and child.id = "SegmentMarker"
-            m.track.removeChild(child)
+            m.top.removeChild(child)
         end if
     end for
 
@@ -321,15 +323,17 @@ sub createSegmentMarkers()
         markerStart = (startPos / m.top.duration) * barWidth
         markerWidth = ((endPos / m.top.duration) * barWidth) - markerStart
 
-        marker = CreateObject("roSGNode", "Rectangle")
+        ' Reuse the same pill-shaped 9-patch as track/fill so markers get
+        ' rounded caps for free instead of square Rectangle corners.
+        marker = CreateObject("roSGNode", "Poster")
         marker.id = "SegmentMarker"
+        marker.uri = m.top.barUri
         marker.width = markerWidth
         marker.height = m.top.trackHeight
-        marker.color = "0xFFFFFF"
-        marker.opacity = 0.5
+        marker.blendColor = "0xFFFFFF80" ' white @ ~50% opacity, same look as before
         marker.translation = [markerStart, 0]
 
-        m.track.appendChild(marker)
+        m.top.appendChild(marker)
     end for
 
     m.segmentMarkerDuration = m.top.duration
