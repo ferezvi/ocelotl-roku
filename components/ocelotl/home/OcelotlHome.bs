@@ -69,9 +69,12 @@ sub init()
 
     m.searchButtonScale = m.top.findNode("searchButtonScale")
     m.searchButtonScaleAnimation = m.top.findNode("searchButtonScaleAnimation")
+    m.settingsButtonScale = m.top.findNode("settingsButtonScale")
+    m.settingsButtonScaleAnimation = m.top.findNode("settingsButtonScaleAnimation")
 
     setButtonColors()
     m.searchButton.observeField("focus", "onSearchButtonFocusChange")
+    m.settingsButton.observeField("focus", "onSettingsButtonFocusChange")
 end sub
 
 sub onSearchButtonFocusChange()
@@ -106,12 +109,17 @@ end sub
 
 sub setButtonColors()
     m.searchButton = m.top.findNode("searchButton")
+    m.settingsButton = m.top.findNode("settingsButton")
 
     m.searchButton.textColor = ColorPalette.TEXT_SECONDARY
     m.searchButton.background = ColorPalette.TRANSPARENT
-
     m.searchButton.focusTextColor = ColorPalette.TEXT_PRIMARY
     m.searchButton.focusBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+
+    m.settingsButton.textColor = ColorPalette.TEXT_SECONDARY
+    m.settingsButton.background = ColorPalette.TRANSPARENT
+    m.settingsButton.focusTextColor = ColorPalette.TEXT_PRIMARY
+    m.settingsButton.focusBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
 end sub
 
 sub loadLibraries()
@@ -506,6 +514,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
             if isStringEqual(key, KeyCode.REPLAY)
                 if not audioMiniPlayerIsVisibleInScene() then return true
                 m.searchButton.focus = false
+                m.settingsButton.focus = false
             end if
 
             if isStringEqual(key, KeyCode.OK)
@@ -517,11 +526,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
                     return true
                 end if
 
+                if m.settingsButton.hasFocus()
+                    m.top.getScene().jumpTo = {
+                        selectionType: "settings"
+                    }
+                    return true
+                end if
+
             end if
 
 
             if isStringEqual(key, KeyCode.DOWN)
                 m.searchButton.focus = false
+                m.settingsButton.focus = false
                 m.homeRows.setFocus(true)
                 setLastFocus(m.homeRows)
                 return true
@@ -531,8 +548,16 @@ function onKeyEvent(key as string, press as boolean) as boolean
             if isStringEqual(key, KeyCode.RIGHT)
 
                 if m.searchButton.hasFocus()
-
                     m.searchButton.focus = false
+                    m.settingsButton.focus = true
+                    m.settingsButton.setFocus(true)
+                    setLastFocus(m.settingsButton)
+                    return true
+                end if
+
+                if m.settingsButton.hasFocus()
+
+                    m.settingsButton.focus = false
 
                     scene = m.top.getScene()
                     if not isValid(scene) then return false
@@ -544,6 +569,19 @@ function onKeyEvent(key as string, press as boolean) as boolean
                     overhang.setFocus(true)
                     setLastFocus(overhang)
 
+                    return true
+                end if
+
+            end if
+
+
+            if isStringEqual(key, KeyCode.LEFT)
+
+                if m.settingsButton.hasFocus()
+                    m.settingsButton.focus = false
+                    m.searchButton.focus = true
+                    m.searchButton.setFocus(true)
+                    setLastFocus(m.searchButton)
                     return true
                 end if
 
@@ -685,4 +723,9 @@ sub onSidebarItemSelected()
             return
         end if
     end for
+end sub
+
+sub onSettingsButtonFocusChange()
+    m.settingsButtonScale.reverse = not m.settingsButton.focus
+    m.settingsButtonScaleAnimation.control = "start"
 end sub

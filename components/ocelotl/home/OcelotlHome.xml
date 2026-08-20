@@ -7,7 +7,7 @@
     <OcelotlSidebar
       id="sidebar"
       translation="[0,0]" />
-    <LayoutGroup id="buttons" translation="[860, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
+    <LayoutGroup id="buttons" translation="[733, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
       <TextButton
         id="searchButton"
         iconSide="left"
@@ -16,6 +16,17 @@
         icon="pkg:/images/ocelotl/icons/search.png"
         focusIcon="pkg:/images/ocelotl/icons/search.png"
         text="Search"
+        height="60"
+        width="230"
+        scaleRotateCenter="[115, 30]" />
+      <TextButton
+        id="settingsButton"
+        iconSide="left"
+        fontSize="30"
+        padding="24"
+        icon="pkg:/images/ocelotl/icons/settings.png"
+        focusIcon="pkg:/images/ocelotl/icons/settings.png"
+        text="Settings"
         height="60"
         width="230"
         scaleRotateCenter="[115, 30]" />
@@ -33,7 +44,13 @@
 
     <Animation id="toggleButtonsAnimation" duration=".7" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="buttonsFade" key="[0.0, .6]" keyValue="[1.00, 0.00]" fieldToInterp="buttons.opacity" />
-      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[860, 100], [860, 0]]" fieldToInterp="buttons.translation" />
+      <Vector2DFieldInterpolator id="buttonsMove" key="[0.1, .9]" keyValue="[[733, 100], [733, 0]]" fieldToInterp="buttons.translation" />
+    </Animation>
+    <Animation id="searchButtonScaleAnimation" duration=".15" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="searchButtonScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.1, 1.1]]" fieldToInterp="searchButton.scale" />
+    </Animation>
+    <Animation id="settingsButtonScaleAnimation" duration=".15" repeat="false" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="settingsButtonScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.1, 1.1]]" fieldToInterp="settingsButton.scale" />
     </Animation>
     <Animation id="backdropCrossfadeAnimation" duration=".5" repeat="false" easeFunction="linear">
       <FloatFieldInterpolator id="backdropAFade" key="[0.0, 1.0]" keyValue="[0.00, 1.00]" fieldToInterp="backdropA.opacity" />
@@ -46,9 +63,6 @@
         key="[0.0,1.0]"
         keyValue="[[150,140],[150,140]]"
         fieldToInterp="homeRows.translation" />
-    </Animation>
-    <Animation id="searchButtonScaleAnimation" duration=".15" repeat="false" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="searchButtonScale" key="[0.0, 1.0]" keyValue="[[1.0, 1.0], [1.1, 1.1]]" fieldToInterp="searchButton.scale" />
     </Animation>
   </children>
   <interface>
