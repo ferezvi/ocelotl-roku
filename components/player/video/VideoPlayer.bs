@@ -124,8 +124,9 @@ sub onVideoContentLoaded()
 
     item = videoContent[0]
 
-    m.skipSegmentsManager.mediaSegments = videoContent[0].mediaSegments
-    m.videoOsd.progressBar.mediaSegments = videoContent[0].mediaSegments
+    m.skipSegmentsManager.mediaSegments = item.mediaSegments
+    m.skipSegmentsManager.chapters = item.chapters
+    m.videoOsd.progressBar.mediaSegments = item.mediaSegments
 
     ' --------------------------------------------------------
     ' Trickplay
@@ -404,6 +405,8 @@ sub onSkipSegmentsAction()
         m.top.seek = action.position
     else if action.type = "nextItem"
         playNextQueueItem()
+    else if action.type = "previousItem"
+        playPreviousQueueItem()
     end if
 end sub
 
@@ -416,5 +419,25 @@ sub playNextQueueItem()
     m.top.control = VideoControl.STOP
     m.global.sceneManager.callFunc("clearPreviousScene")
     m.global.queueManager.callFunc("moveForward")
+    m.global.queueManager.callFunc("playQueue")
+end sub
+
+sub playPreviousQueueItem()
+    currentPosition = m.global.queueManager.callFunc("getPosition")
+    print "[VideoPlayer] PREVIOUS - position BEFORE="; currentPosition
+
+    if currentPosition <= 0
+        print "[VideoPlayer] PREVIOUS - already at first item"
+        return
+    end if
+
+    m.top.control = VideoControl.STOP
+    m.global.sceneManager.callFunc("clearPreviousScene")
+
+    m.global.queueManager.callFunc("moveBack")
+
+    newPosition = m.global.queueManager.callFunc("getPosition")
+    print "[VideoPlayer] PREVIOUS - position AFTER="; newPosition
+
     m.global.queueManager.callFunc("playQueue")
 end sub

@@ -124,17 +124,17 @@ sub onOSDAction(event as object)
             m.top.control = VideoControl.RESUME
         end if
 
+    else if action = "skipBackButton"
+        m.skipSegmentsManager.callFunc("previousChapter")
+
     else if action = "rewindButton"
         m.top.seek = max(0, m.top.position - SEEK_SECONDS)
 
     else if action = "fastForwardButton"
         m.top.seek = m.top.position + SEEK_SECONDS
 
-    else if action = "skipBackButton"
-        m.top.seek = max(0, m.top.position - SKIP_SECONDS)
-
     else if action = "skipForwardButton"
-        m.top.seek = m.top.position + SKIP_SECONDS
+        m.skipSegmentsManager.callFunc("nextChapter")
 
     else if action = "seek"
         if m.videoOsd.seekPosition <> invalid

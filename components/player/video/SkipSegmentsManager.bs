@@ -3,6 +3,8 @@ import "pkg:/source/enums/MediaSegmentAction.bs"
 import "pkg:/source/enums/MediaSegmentType.bs"
 import "pkg:/source/utils/misc.bs"
 
+const CHAPTER_EDGE_PERCENT = 10
+
 sub init()
     m.skipButton = m.top.findNode("skipButton")
 
@@ -179,3 +181,90 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
+
+function getCurrentChapterIndex(position as double) as integer
+    if not isValidAndNotEmpty(m.top.chapters) then return -1
+
+    currentIndex = 0
+
+    for i = m.top.chapters.Count() - 1 to 0 step -1
+        chapterStart = m.top.chapters[i].StartPositionTicks / 10000000#
+
+        if position >= chapterStart
+            currentIndex = i
+            exit for
+        end if
+    end for
+
+    return currentIndex
+end function
+
+function getChapterProgress(position as double, chapterIndex as integer) as double
+    if chapterIndex < 0 or chapterIndex >= m.top.chapters.Count() then return 0
+
+    chapterStart = m.top.chapters[chapterIndex].StartPositionTicks / 10000000#
+
+    if chapterIndex < m.top.chapters.Count() - 1
+        chapterEnd = m.top.chapters[chapterIndex + 1].StartPositionTicks / 10000000#
+    else
+        chapterEnd = m.top.duration
+    end if
+
+    chapterDuration = chapterEnd - chapterStart
+    if chapterDuration <= 0 then return 100
+
+    progress = ((position - chapterStart) / chapterDuration) * 100
+
+    if progress < 0 then progress = 0
+    if progress > 100 then progress = 100
+
+    return progress
+end function
+
+sub previousChapter()
+    if not isValidAndNotEmpty(m.top.chapters)
+        m.top.action = { type: "previousItem" }
+        return
+    end if
+
+    currentIndex = getCurrentChapterIndex(m.top.position)
+    if currentIndex < 0 then return
+
+    progress = getChapterProgress(m.top.position, currentIndex)
+
+    if progress <= 10
+        if currentIndex > 0
+            currentIndex--
+        else
+            m.top.action = { type: "previousItem" }
+            return
+        end if
+    end if
+
+    position = m.top.chapters[currentIndex].StartPositionTicks / 10000000#
+
+    m.top.action = {
+        type: "seek",
+        position: position
+    }
+end sub
+
+sub nextChapter()
+    if not isValidAndNotEmpty(m.top.chapters) then return
+
+    currentIndex = getCurrentChapterIndex(m.top.position)
+    if currentIndex < 0 then return
+
+    if currentIndex >= m.top.chapters.Count() - 1
+        m.top.action = { type: "nextItem" }
+        return
+    end if
+
+    nextIndex = currentIndex + 1
+    position = m.top.chapters[nextIndex].StartPositionTicks / 10000000#
+
+    m.top.action = {
+        type: "seek",
+        position: position
+    }
+end sub
