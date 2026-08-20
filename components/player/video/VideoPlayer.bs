@@ -428,10 +428,8 @@ end sub
 
 sub playPreviousQueueItem()
     currentPosition = m.global.queueManager.callFunc("getPosition")
-    print "[VideoPlayer] PREVIOUS - position BEFORE="; currentPosition
 
     if currentPosition <= 0
-        print "[VideoPlayer] PREVIOUS - already at first item"
         return
     end if
 
@@ -440,9 +438,6 @@ sub playPreviousQueueItem()
     m.global.sceneManager.callFunc("clearPreviousScene")
 
     m.global.queueManager.callFunc("moveBack")
-
-    newPosition = m.global.queueManager.callFunc("getPosition")
-    print "[VideoPlayer] PREVIOUS - position AFTER="; newPosition
 
     m.global.queueManager.callFunc("playQueue")
 end sub
