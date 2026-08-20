@@ -422,8 +422,16 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
-    if isStringEqual(key, KeyCode.BACK) and m.progressBar.hasFocus() and m.progressBar.isSeeking
-        return false ' let progress bar cancel its own seek first
+    if isStringEqual(key, KeyCode.BACK)
+        if m.progressBar.hasFocus() and m.progressBar.isSeeking
+            return false
+        end if
+
+        m.synopsisPanel.visible = false
+        m.mediaInfoPanel.visible = false
+        m.languagePanel.visible = false
+        m.top.action = "hide"
+        return true
     end if
 
     if isStringEqual(key, KeyCode.UP)
@@ -467,11 +475,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
     else if isStringEqual(key, KeyCode.RIGHT) and m.optionControls.isInFocusChain()
         return true ' edge of the row - no horizontal handoff between rows anymore
 
-    else if isStringEqual(key, KeyCode.BACK)
-        m.synopsisPanel.visible = false
-        m.mediaInfoPanel.visible = false
-        m.top.action = "hide"
-        return true
     end if
 
     return false

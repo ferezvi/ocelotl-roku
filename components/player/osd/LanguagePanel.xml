@@ -10,7 +10,7 @@
         <Poster
             id="background"
             uri="pkg:/images/ui/gradientes/language_panel.png"
-            width="960"
+            width="1280"
             height="1080" />
         <LayoutGroup id="columnsContainer" layoutDirection="horiz" itemSpacings="[20]" translation="[20,290]">
             <LayoutGroup id="audioColumn" layoutDirection="vert" itemSpacings="[18]">

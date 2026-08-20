@@ -449,7 +449,9 @@ sub cleanupBeforeExit()
     m.loadContentTask.control = "stop"
     m.loadContentTask.unobserveField("content")
 
-    m.trickplay.callFunc("stopPreload")
+    if isValid(m.trickplay)
+        m.trickplay.callFunc("stopPreload")
+    end if
 
     if isValid(m.captionTask)
         m.captionTask.control = "stop"
