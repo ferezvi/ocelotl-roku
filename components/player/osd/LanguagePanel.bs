@@ -17,6 +17,9 @@ sub init()
     m.focusedColumn = "audio"
     m.focusedIndex = 0
 
+    m.selectionTimer = m.top.findNode("selectionTimer")
+    m.selectionTimer.observeField("fire", "onSelectionTimer")
+
 end sub
 
 ' onAudioContentChanged: Rebuilds the Audio column's button list from m.top.audioContent
@@ -136,7 +139,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
             end for
 
             refreshColumnCheckmarks(activeGroup, activeData)
-            m.top.selectionMade = activeData[m.focusedIndex]
+            m.pendingSelection = activeData[m.focusedIndex]
+            m.selectionTimer.control = "start"
         end if
         return true
     end if
@@ -160,4 +164,8 @@ sub refreshColumnCheckmarks(buttonGroup as object, data as object)
         isSelected = isValid(data[i].selected) and data[i].selected
         children[i].text = isSelected ? Chr(&h2713) + " " + data[i].track.description : data[i].track.description
     end for
+end sub
+
+sub onSelectionTimer()
+    m.top.selectionMade = m.pendingSelection
 end sub

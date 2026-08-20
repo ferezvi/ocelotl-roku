@@ -7,6 +7,7 @@
         <field id="keyPressed" type="boolean" alwaysNotify="true" />
     </interface>
     <children>
+        <timer id="selectionTimer" duration="0.01" />
         <Poster
             id="background"
             uri="pkg:/images/ui/gradientes/language_panel.png"
