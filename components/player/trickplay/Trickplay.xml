@@ -10,6 +10,7 @@
         <field id="previewPosition" type="float" />
         <field id="isSeeking" type="boolean" />
         <field id="resumeTilesReady" type="boolean" alwaysNotify="true" />
+        <function name="stopPreload" />
     </interface>
 
     <children>

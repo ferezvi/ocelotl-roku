@@ -34,6 +34,7 @@ sub initBufferHandler()
     m.lastBufferError = 0
     m.playbackTestComplete = false
     m.playbackSanityChecked = false
+    m.reloadingForTranscode = false
 
     m.bufferCheckTimer = m.top.findNode("bufferCheckTimer")
     m.bufferCheckTimer.observeField("fire", "onBufferCheckTimerFire")
@@ -179,6 +180,8 @@ end sub
 ' bufferStuckAt100Check / playbackFailureTest / playbackCheck.
 ' ------------------------------------------------------------
 sub escalateTranscodeFallback(reason as string)
+    m.reloadingForTranscode = true
+
     currentForceTranscode = m.global.queueManager.callFunc("getForceTranscode")
 
     if isStringEqual(PlaybackMethod.PLAYNORMALLY, currentForceTranscode)
@@ -238,5 +241,10 @@ end sub
 
 sub onPlaybackSanityTimerFire()
     playbackCheck()
+
+    ' If playbackCheck() already triggered a reload, don't run a second
+    ' check that could double-observe loadContentTask's "content" field.
+    if m.reloadingForTranscode then return
+
     playbackFailureTest()
 end sub

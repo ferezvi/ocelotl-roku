@@ -127,7 +127,11 @@ sub onKeyPressed()
 end sub
 
 sub onSeekActivity()
-    resetInactivityTimer()
+    if m.progressBar.isSeeking
+        m.inactivityTimer.control = "stop" '
+    else
+        resetInactivityTimer()
+    end if
 end sub
 
 ' ------------------------------------------------------------
@@ -345,6 +349,7 @@ end sub
 sub toggleMediaInfoPanel()
     if m.mediaInfoPanel.visible
         m.mediaInfoPanel.visible = false
+        m.mediaInfoTask.control = "STOP" ' cancela un fetch en curso si lo hay, sin destruir el nodo
         return
     end if
 
@@ -471,3 +476,11 @@ function onKeyEvent(key as string, press as boolean) as boolean
 
     return false
 end function
+
+sub cleanupTimers()
+    m.inactivityTimer.control = "stop"
+
+    if isValid(m.mediaInfoTask)
+        m.mediaInfoTask.control = "stop"
+    end if
+end sub

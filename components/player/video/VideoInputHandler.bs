@@ -42,14 +42,12 @@ function onKeyEvent(key as string, press as boolean) as boolean
     ' First BACK hides the OSD; second BACK stops and exits.
     if isStringEqual(key, KeyCode.BACK)
         if m.videoOsd.visible
-            print "[VideoInputHandler] BACK -> hide OSD"
             hideOSD()
             return true
         end if
 
-        print "[VideoInputHandler] BACK -> STOP"
         m.top.control = VideoControl.STOP
-        print "[VideoInputHandler] state after STOP="; m.top.state
+        cleanupBeforeExit()
         m.global.sceneManager.callFunc("popScene")
         return true
     end if

@@ -1,5 +1,5 @@
-import "pkg:/source/utils/misc.bs"
 import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/utils/misc.bs"
 
 ' ============================================================
 ' CONSTANTS
@@ -879,4 +879,10 @@ sub onTrickplayPreviewPositionChanged()
     end if
 
     updateTrickplay(m.top.previewPosition)
+end sub
+
+sub stopPreload()
+    if isValid(m.preloadTask)
+        m.preloadTask.control = "stop"
+    end if
 end sub

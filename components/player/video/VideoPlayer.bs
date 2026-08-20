@@ -21,13 +21,18 @@ sub init()
     m.playerSpinner = m.top.findNode("playerSpinner")
     m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
 
-    ' Trickplay is now fully encapsulated in its own component, including
-    ' its own tile preload Task. VideoPlayer only feeds it inputs and reacts
-    ' to resumeTilesReady to know when it's safe to start playback.
     m.trickplay = m.top.findNode("trickplay")
     m.trickplay.observeField("resumeTilesReady", "onTrickplayResumeTilesReady")
     m.videoOsd.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
     m.videoOsd.observeField("isSeeking", "onTrickplaySeekingChanged")
+
+    ' Timeout de seguridad para el trickplay priority preload -
+    ' creado una sola vez, reutilizado en cada carga (ver onVideoContentLoaded).
+    m.trickplayStartTimeoutTimer = CreateObject("roSGNode", "Timer")
+    m.trickplayStartTimeoutTimer.duration = 5
+    m.trickplayStartTimeoutTimer.repeat = false
+    m.trickplayStartTimeoutTimer.observeField("fire", "onTrickplayStartTimeout")
+    m.top.appendChild(m.trickplayStartTimeoutTimer)
 
     m.skipSegmentsManager = m.top.findNode("skipSegmentsManager")
     m.skipSegmentsManager.observeField("action", "onSkipSegmentsAction")
@@ -68,6 +73,7 @@ sub init()
     m.loadContentTask.itemId = currentItem.id
     m.loadContentTask.itemType = currentItem.type
     m.loadContentTask.selectedAudioStreamIndex = currentItem.selectedAudioStreamIndex
+    m.loadContentTask.unobserveField("content")
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
 
@@ -154,6 +160,7 @@ sub onVideoContentLoaded()
     m.top.PlaySessionId = item.PlaySessionId
     m.top.videoId = item.id
     m.playbackSanityChecked = false
+    m.reloadingForTranscode = false
     m.runtimeticks = item.runtimeticks
     m.top.container = item.container
     m.top.mediaSourceId = item.mediaSourceId
@@ -225,13 +232,10 @@ sub onVideoContentLoaded()
     if m.waitingForPriorityTrickplay
         m.playerSpinner.visible = true
 
-        m.trickplayStartTimeoutTimer = CreateObject("roSGNode", "Timer")
-        m.trickplayStartTimeoutTimer.duration = 5
-        m.trickplayStartTimeoutTimer.repeat = false
-        m.trickplayStartTimeoutTimer.observeField("fire", "onTrickplayStartTimeout")
-        m.top.appendChild(m.trickplayStartTimeoutTimer)
-        m.trickplayStartTimeoutTimer.control = "start"
-
+        if isValid(m.trickplayStartTimeoutTimer)
+            m.trickplayStartTimeoutTimer.control = "stop"
+            m.trickplayStartTimeoutTimer.control = "start"
+        end if
     else
         m.top.control = VideoControl.PLAY
         m.top.setFocus(true)
@@ -256,10 +260,7 @@ sub beginDeferredPlayback()
     end if
 
     m.waitingForPriorityTrickplay = false
-
-    if isValid(m.trickplayStartTimeoutTimer)
-        m.trickplayStartTimeoutTimer.control = "stop"
-    end if
+    m.trickplayStartTimeoutTimer.control = "stop"
 
     ' Leave the spinner visible through the handoff to VideoControl.PLAY —
     ' onStateChanged will take over once BUFFERING fires. Turning it off
@@ -417,6 +418,7 @@ sub playNextQueueItem()
     end if
 
     m.top.control = VideoControl.STOP
+    cleanupBeforeExit()
     m.global.sceneManager.callFunc("clearPreviousScene")
     m.global.queueManager.callFunc("moveForward")
     m.global.queueManager.callFunc("playQueue")
@@ -432,6 +434,7 @@ sub playPreviousQueueItem()
     end if
 
     m.top.control = VideoControl.STOP
+    cleanupBeforeExit()
     m.global.sceneManager.callFunc("clearPreviousScene")
 
     m.global.queueManager.callFunc("moveBack")
@@ -440,4 +443,22 @@ sub playPreviousQueueItem()
     print "[VideoPlayer] PREVIOUS - position AFTER="; newPosition
 
     m.global.queueManager.callFunc("playQueue")
+end sub
+
+sub cleanupBeforeExit()
+    m.loadContentTask.control = "stop"
+    m.loadContentTask.unobserveField("content")
+
+    m.trickplay.callFunc("stopPreload")
+
+    if isValid(m.captionTask)
+        m.captionTask.control = "stop"
+    end if
+
+    m.bufferCheckTimer.control = "stop"
+    m.bufferStuckTimer.control = "stop"
+    m.playbackSanityTimer.control = "stop"
+    m.playbackTimer.control = "stop"
+
+    m.videoOsd.callFunc("cleanupTimers")
 end sub

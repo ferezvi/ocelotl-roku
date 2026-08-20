@@ -30,6 +30,7 @@
         <field id="trackSelected" type="assocarray" alwaysNotify="true" />
         <field id="progressBar" type="node" />
         <field id="skipSegmentsManager" type="node" onChange="onSkipSegmentsManagerChanged" />
+        <function name="cleanupTimers" />
     </interface>
 
     <children>

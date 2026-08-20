@@ -14,6 +14,7 @@ import "pkg:/source/utils/misc.bs"
 sub initSubtitleHandler()
     m.top.observeField("SelectedSubtitle", "onSubtitleChange")
     m.top.observeField("allowCaptions", "onAllowCaptionsChange")
+    setupCaptionInfra()
 end sub
 
 ' ============================================================
@@ -120,19 +121,22 @@ end sub
 ' CUSTOM CAPTIONS (burn-in overlay)
 ' ============================================================
 
-sub onAllowCaptionsChange()
-    if not m.top.allowCaptions
-        return
-    end if
-
+sub setupCaptionInfra()
     m.captionGroup = m.top.findNode("captionGroup")
     m.captionGroup.createchildren(9, "LayoutGroup")
 
     m.captionTask = createObject("roSGNode", "captionTask")
+    m.top.appendChild(m.captionTask) ' was missing - task needs to be in the tree to run
     m.captionTask.observeField("currentCaption", "updateCaption")
 
     m.top.observeField("subtitleTrack", "loadCaption")
     m.top.observeField("globalCaptionMode", "toggleCaption")
+end sub
+
+sub onAllowCaptionsChange()
+    if not m.top.allowCaptions
+        return
+    end if
 
     customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
 

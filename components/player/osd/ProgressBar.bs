@@ -25,6 +25,7 @@ sub init()
     m.seekRepeatTimer.duration = 0.5
     m.seekRepeatTimer.repeat = true
     m.seekRepeatTimer.observeField("fire", "onSeekRepeatTimerFire")
+    m.top.appendChild(m.seekRepeatTimer)
 
     setColors()
     onBarUriChanged()

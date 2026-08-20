@@ -15,6 +15,7 @@ sub init()
     m.top.observeField("itemSeason", "onSeasonChanged")
     m.top.observeField("itemEpisode", "onEpisodeChanged")
     m.top.observeField("itemEpisodeEnd", "onEpisodeEndChanged")
+    m.logoPoster.observeField("loadStatus", "onLogoLoadStatusChanged")
     m.top.observeField("itemLogo", "onLogoChanged")
 end sub
 
@@ -54,7 +55,6 @@ sub onLogoChanged()
 
     m.logoPoster.uri = m.top.itemLogo
     m.logoPoster.visible = true
-    m.logoPoster.observeField("loadStatus", "onLogoLoadStatusChanged")
 end sub
 
 sub onLogoLoadStatusChanged(event)
