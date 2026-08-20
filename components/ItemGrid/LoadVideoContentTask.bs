@@ -289,6 +289,7 @@ sub LoadItems_AddVideoContent(video as object, mediaSourceId as dynamic, audio_s
     end if
 
     addAudioStreamsToVideo(video)
+    addVideoDimensionsToVideo(video)
     if meta.live
         video.transcodeParams = {
             "MediaSourceId": m.playbackInfo.MediaSources[0].Id,
@@ -436,6 +437,18 @@ sub addAudioStreamsToVideo(video)
     end for
 
     video.fullAudioData = audioStreams
+end sub
+
+sub addVideoDimensionsToVideo(video)
+    mediaStreams = m.playbackInfo.MediaSources[0].MediaStreams
+
+    for each stream in mediaStreams
+        if LCase(stream.Type) = "video"
+            video.videoWidth = stream.Width
+            video.videoHeight = stream.Height
+            exit for
+        end if
+    end for
 end sub
 
 sub addSubtitlesToVideo(video, meta)

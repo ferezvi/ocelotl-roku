@@ -6,6 +6,9 @@
               <field id="currentCaption" type="roArray" />
               <field id="playerState" type="string" />
               <field id="currentPos" type="int" />
+              <field id="videoWidth" type="int" />
+              <field id="videoHeight" type="int" />
+              <function name="updateCaptionPosition" />
        </interface>
        <children>
               <timer id="captionTimer" repeat="true" duration="0.1" />

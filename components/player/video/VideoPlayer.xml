@@ -30,6 +30,8 @@
         <field id="disableNextEpisodeAutoPlay" type="boolean" value="false" />
 
         <field id="videoId" type="string" />
+        <field id="videoWidth" type="int" value="0" />
+        <field id="videoHeight" type="int" value="0" />
         <field id="mediaSourceId" type="string" />
         <field id="fullSubtitleData" type="array" />
         <field id="fullAudioData" type="array" />

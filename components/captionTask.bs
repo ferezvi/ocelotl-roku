@@ -6,14 +6,16 @@ import "pkg:/source/enums/MediaPlaybackState.bs"
 import "pkg:/source/enums/String.bs"
 import "pkg:/source/utils/config.bs"
 
-const SCREEN_PADDING = 60
-const LOWEST_CAPTION = 1080 - SCREEN_PADDING
-const VIEWABLE_AREA = 1080 - 2 * SCREEN_PADDING
+const SCREEN_WIDTH = 1920
+const SCREEN_HEIGHT = 1080
+const SCREEN_PADDING = 105
+const VIEWABLE_AREA = SCREEN_HEIGHT - 2 * SCREEN_PADDING
 ' Maximum width allowed before caption text wraps to the next line
 const SAFE_TEXT_WIDTH = Int(1920 * 0.75)
 
 sub init()
     m.top.playerState = MediaPlaybackState.STOPPED
+    m.lowestCaption = SCREEN_HEIGHT - SCREEN_PADDING
     m.top.observeField("url", "fetchCaption")
     m.top.currentCaption = []
     m.top.currentPos = 0
@@ -57,6 +59,30 @@ sub init()
     ' Hidden label used to measure caption text for word wrapping.
     createMeasureLabel()
 
+end sub
+
+sub updateCaptionPosition()
+    videoWidth = m.top.videoWidth
+    videoHeight = m.top.videoHeight
+
+    m.lowestCaption = SCREEN_HEIGHT - SCREEN_PADDING
+
+    if videoWidth <= 0 or videoHeight <= 0
+        return
+    end if
+
+    videoAspect = videoWidth / videoHeight
+
+    if videoAspect <= (16.0 / 9.0)
+        return
+    end if
+
+    visibleVideoHeight = SCREEN_WIDTH * videoHeight / videoWidth
+    bottomBarHeight = (SCREEN_HEIGHT - visibleVideoHeight) / 2
+
+    if bottomBarHeight > SCREEN_PADDING
+        m.lowestCaption = SCREEN_HEIGHT - bottomBarHeight
+    end if
 end sub
 
 sub fetchCaption()
@@ -635,7 +661,13 @@ sub adjustForCaptionOverlaps(newCaption, existingCaptions, moveDirection = Capti
                 calculatedVerticalPosition = newCaptionBounds.y - comparisonCaptionBounds.height
             end if
 
-            if calculatedVerticalPosition < 0 then calculatedVerticalPosition = 0
+            if calculatedVerticalPosition < 0
+                calculatedVerticalPosition = 0
+            end if
+
+            if calculatedVerticalPosition + comparisonCaptionBounds.height > m.lowestCaption
+                calculatedVerticalPosition = m.lowestCaption - comparisonCaptionBounds.height
+            end if
 
             comparisonCaption.translation = [comparisonCaption.translation[0], calculatedVerticalPosition]
             adjustForCaptionOverlaps(comparisonCaption, existingCaptions, moveDirection)
@@ -651,9 +683,9 @@ end function
 
 function prepareStyles(styles as object, rect, lineCount = 1 as integer) as object
     captionStyles = styles
-    finalStyles = { translation: [960, LOWEST_CAPTION] }
+    finalStyles = { translation: [960, m.lowestCaption] }
 
-    verticalPosition = LOWEST_CAPTION
+    verticalPosition = m.lowestCaption
     horizontalPosition = 960 - (rect.BoundingRect().width / 2)
 
     ' Use isValid instead of isValidAndNotEmpty to allow empty style objects ({})
@@ -666,11 +698,11 @@ function prepareStyles(styles as object, rect, lineCount = 1 as integer) as obje
     captionPosition = chainLookupReturn(captionStyles, "position", string.EMPTY)
 
     ' Line
-    ' If no line cue is present, position the caption so its bottom edge sits at LOWEST_CAPTION.
+    ' If no line cue is present, position the caption so its bottom edge sits at m.lowestCaption.
     ' Previously this case was never handled, causing captions to render off-screen.
     captionLineHeight = (rect.BoundingRect().height / lineCount)
     if isStringEqual(captionLine, string.EMPTY)
-        verticalPosition = LOWEST_CAPTION - rect.BoundingRect().height
+        verticalPosition = m.lowestCaption - rect.BoundingRect().height
     else
         verticalPosition = processLineCue(captionLine, captionLineHeight, rect.BoundingRect().height)
     end if
@@ -718,12 +750,12 @@ function processLineCue(captionLine as string, captionLineHeight as float, capti
             calculatedPosition = SCREEN_PADDING + lineValue * captionLineHeight
         else
             ' A negative line value. Count from the bottom
-            calculatedPosition = LOWEST_CAPTION - Abs(lineValue * captionLineHeight)
+            calculatedPosition = m.lowestCaption - Abs(lineValue * captionLineHeight)
         end if
     end if
 
-    if calculatedPosition + captionTotalHeight > LOWEST_CAPTION
-        return LOWEST_CAPTION - captionTotalHeight
+    if calculatedPosition + captionTotalHeight > m.lowestCaption
+        return m.lowestCaption - captionTotalHeight
     end if
 
     if calculatedPosition < SCREEN_PADDING

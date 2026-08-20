@@ -169,6 +169,8 @@ sub onVideoContentLoaded()
     m.top.audioIndex = item.audioIndex
     m.top.transcodeParams = item.transcodeparams
     m.top.isTranscoded = item.isTranscoded
+    m.top.videoWidth = item.videoWidth
+    m.top.videoHeight = item.videoHeight
 
     m.videoOsd.videoId = item.id
     m.top.content = item.content

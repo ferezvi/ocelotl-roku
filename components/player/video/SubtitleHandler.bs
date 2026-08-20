@@ -126,10 +126,15 @@ sub setupCaptionInfra()
     m.captionGroup.createchildren(9, "LayoutGroup")
 
     m.captionTask = createObject("roSGNode", "captionTask")
-    m.top.appendChild(m.captionTask) ' was missing - task needs to be in the tree to run
+    m.captionTask.videoWidth = m.top.videoWidth
+    m.captionTask.videoHeight = m.top.videoHeight
+    m.top.appendChild(m.captionTask)
+    m.captionTask.callFunc("updateCaptionPosition")
     m.captionTask.observeField("currentCaption", "updateCaption")
 
     m.top.observeField("subtitleTrack", "loadCaption")
+    m.top.observeField("videoWidth", "onVideoDimensionsChanged")
+    m.top.observeField("videoHeight", "onVideoDimensionsChanged")
     m.top.observeField("globalCaptionMode", "toggleCaption")
 end sub
 
@@ -168,4 +173,10 @@ end sub
 sub updateCaption()
     m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
     m.captionGroup.appendChildren(m.captionTask.currentCaption)
+end sub
+
+sub onVideoDimensionsChanged()
+    m.captionTask.videoWidth = m.top.videoWidth
+    m.captionTask.videoHeight = m.top.videoHeight
+    m.captionTask.callFunc("updateCaptionPosition")
 end sub
