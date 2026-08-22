@@ -21,6 +21,7 @@ sub init()
 
     m.scrollBarThumbSlideAnimation = m.top.findnode("scrollBarThumbSlideAnimation")
     m.scrollBarThumbSlideInterpolator = m.top.findnode("scrollBarThumbSlideInterpolator")
+    m.backdrop = m.top.findNode("backdrop")
 
     m.scrollBar = m.top.findnode("scrollBar")
     m.thumb = m.top.findnode("thumb")
@@ -239,51 +240,6 @@ sub onSelectedPartChanged()
     m.top.refreshMovieDetailsData = not m.top.refreshMovieDetailsData
 end sub
 
-' setBackdropImage: If item has a backdrop image, use it as the background for the view
-'
-' @param {object} itemData - meta data for current item
-sub setBackdropImage(itemData as object)
-    if isValidAndNotEmpty(itemData.BackdropImageTags)
-        imageVersion = ImageType.BACKDROP
-        imageTag = itemData.BackdropImageTags[0]
-    else
-        imageVersion = ImageType.PRIMARY
-        imageTag = itemData.ImageTags.Primary
-    end if
-
-    ' Create a blank background so the user's background image doesn't bleed over
-    movieBackground = m.top.findNode("movieBackground")
-    if not isValid(movieBackground)
-        movieBackground = createObject("roSGNode", "Rectangle")
-    end if
-    movieBackground.id = "movieBackground"
-    movieBackground.width = "1920"
-    movieBackground.height = "1080"
-    movieBackground.color = "#000000"
-    if not isValid(m.top.findNode("movieBackdrop"))
-        m.top.insertChild(movieBackground, 0)
-    end if
-
-    movieBackdrop = m.top.findNode("movieBackdrop")
-    if not isValid(movieBackdrop)
-        movieBackdrop = createObject("roSGNode", "Poster")
-    end if
-    movieBackdrop.id = "movieBackdrop"
-    movieBackdrop.loadDisplayMode = "scaleToZoom"
-    movieBackdrop.translation = "[0,0]"
-    movieBackdrop.width = "1920"
-    movieBackdrop.height = "1080"
-    movieBackdrop.opacity = .3
-    movieBackdrop.uri = ImageURL(m.top.id, imageVersion, {
-        "maxWidth": 1920,
-        "Tag": imageTag
-    })
-
-    if not isValid(m.top.findNode("movieBackdrop"))
-        m.top.insertChild(movieBackdrop, 1)
-    end if
-end sub
-
 sub onLogoImageURIChange()
     ' We have exhaused all methods for getting a logo to display
     if m.top.logoImageURI = "" and not isChainValid(m.top.itemContent.json, "ImageTags.Logo")
@@ -397,7 +353,7 @@ sub itemContentChanged()
         end if
     end if
 
-    setBackdropImage(itemData)
+    m.backdrop.callFunc("setItem", item)
     setLogoImage(itemData)
 
     ' Set default video source if user hasn't selected one yet

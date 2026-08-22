@@ -1,7 +1,7 @@
 import "pkg:/source/api/Image.bs"
 import "pkg:/source/utils/misc.bs"
 
-const BACKDROP_OPACITY = 0.5
+const BACKDROP_OPACITY = 0.3
 
 sub init()
     m.backdropA = m.top.findNode("backdropA")
@@ -39,8 +39,8 @@ sub setImage(backdropUri as string)
     end if
 
     ' Load into the inactive poster
-    m.inactiveBackdrop.uri = backdropUri
     m.pendingBackdropTarget = m.inactiveBackdrop
+    m.inactiveBackdrop.uri = backdropUri
 end sub
 
 sub clear()
@@ -111,7 +111,7 @@ function getBackdropUri(item as object) as string
         if backdrop <> "" then return backdrop
     end if
 
-    if item.type = "MusicAlbum" or item.type = "Audio"
+    if isStringEqual(item.type, "MusicAlbum") or isStringEqual(item.type, "Audio")
 
         if isValidAndNotEmpty(item.json.AlbumArtists)
             artistId = item.json.AlbumArtists[0].Id
@@ -148,7 +148,7 @@ function getBackdropUri(item as object) as string
         end if
     end if
 
-    if item.type = "Episode" and isValidAndNotEmpty(item.json.seriesid)
+    if isStringEqual(item.type, "Episode") and isValidAndNotEmpty(item.json.seriesid)
         return ImageURL(item.json.seriesid, ImageType.BACKDROP, {
             maxHeight: backdropHeight,
             maxWidth: backdropWidth,

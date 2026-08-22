@@ -106,8 +106,6 @@ end sub
 
 ' JFScreen hook called when the screen is hidden by the screen manager
 sub OnScreenHidden()
-    m.backdrop.callFunc("release")
-
     scene = m.top.getScene()
     overhang = scene.findNode("overhang")
     if isValid(overhang)
