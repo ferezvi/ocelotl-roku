@@ -28,6 +28,7 @@ sub init()
 
     m.homeRows = m.top.findNode("homeRows")
     m.homeRows.focusBitmapBlendColor = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+    m.backdrop = m.top.findNode("backdrop")
 
     m.buttons = m.top.findNode("buttons")
     m.toggleButtonsAnimation = m.top.findNode("toggleButtonsAnimation")
@@ -105,6 +106,8 @@ end sub
 
 ' JFScreen hook called when the screen is hidden by the screen manager
 sub OnScreenHidden()
+    m.backdrop.callFunc("release")
+
     scene = m.top.getScene()
     overhang = scene.findNode("overhang")
     if isValid(overhang)
@@ -141,6 +144,18 @@ sub toggleButtonsVisibility(runInReverse = false as boolean)
     if not isStringEqual(m.toggleButtonsAnimation.state, AnimationState.RUNNING)
         m.toggleButtonsAnimation.control = AnimationControl.START
     end if
+end sub
+
+sub onHomeItemFocusedChange()
+    if not isValid(m.homeRows.rowItemFocused) then return
+
+    row = m.homeRows.rowItemFocused[0]
+    col = m.homeRows.rowItemFocused[1]
+
+    focusedItem = m.homeRows.content.getChild(row).getChild(col)
+    if not isValid(focusedItem) then return
+
+    m.backdrop.callFunc("setItem", focusedItem)
 end sub
 
 sub onMyListLoaded()
