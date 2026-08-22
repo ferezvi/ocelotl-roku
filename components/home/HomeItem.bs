@@ -16,6 +16,9 @@ sub init()
     findNodes()
     m.itemPoster.observeField("loadStatus", "onPosterLoadStatusChanged")
     setColors()
+    ' Flag for the first progress bar draw.
+    ' Prevents animation when HomeItems are recreated.
+    m.isFirstProgressDraw = true
 end sub
 
 sub setColors()
@@ -82,6 +85,9 @@ sub itemContentChanged()
     if not isValid(itemData) then return
     localGlobal = m.global
     itemDataType = isValid(itemData.type) ? LCase(itemData.type) : ""
+
+    ' Reset the progress bar animation flag when new content is loaded.
+    m.isFirstProgressDraw = true
 
     if isValid(m.playedIndicator)
         m.playedIndicator.data = {
@@ -498,8 +504,19 @@ sub drawProgressBar(itemData)
 
     m.itemProgressBackground.width = itemData.LookupCI("imageWidth")
     m.itemProgressBackground.visible = true
-    m.showProgressBarField.keyValue = [0, m.itemPoster.width * (itemData.PlayedPercentage / 100)]
-    m.showProgressBarAnimation.control = AnimationControl.START
+
+    targetWidth = m.itemPoster.width * (itemData.PlayedPercentage / 100)
+
+    ' Set the progress bar directly on its first draw.
+    ' Animate subsequent progress updates.
+    if m.isFirstProgressDraw
+        m.itemProgress.width = targetWidth
+        m.isFirstProgressDraw = false
+    else
+        m.showProgressBarField.keyValue = [m.itemProgress.width, targetWidth]
+        m.showProgressBarAnimation.control = AnimationControl.START
+    end if
+
 end sub
 
 '
