@@ -16,6 +16,7 @@ sub init()
     m.top.optionsAvailable = false
     m.defaultClippingRect = "[-10,-10,2020,420]"
 
+    m.backdrop = m.top.findNode("backdrop")
     m.settingsButton = m.top.findNode("settingsButton")
     m.settingsButton.observeFieldScoped("selected", "onsettingsButtonSelected")
     m.settingsButton.highlightBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
@@ -176,6 +177,12 @@ sub updateSeason()
         played: chainLookupReturn(m.top.seasonData.json, "UserData.Played", false),
         unplayedCount: chainLookupReturn(m.top.seasonData.json, "UserData.UnplayedItemCount", 0)
     }
+
+    print "[SEASON BACKDROP] type="; m.top.seasonData.type
+    print "[SEASON BACKDROP] id="; m.top.seasonData.json.Id
+    print "[SEASON BACKDROP] seriesId="; m.top.seasonData.json.LookupCI("SeriesId")
+    print "[SEASON BACKDROP] tags="; m.top.seasonData.json.LookupCI("BackdropImageTags")
+    m.backdrop.callFunc("setItem", m.top.seasonData)
 
     m.tvExtrasTask.seasonID = m.top.seasonData.json.Id
     m.tvExtrasTask.control = TaskControl.RUN
@@ -375,6 +382,10 @@ sub OnScreenShown()
     end if
 
     m.top.refreshSeasonDetailsData = not m.top.refreshSeasonDetailsData
+end sub
+
+sub OnScreenHidden()
+    m.backdrop.callFunc("release")
 end sub
 
 sub onDisplayResumeButtonChange()

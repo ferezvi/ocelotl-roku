@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="TVSeasonDetails" extends="JFScreen">
   <children>
+    <Backdrop id="backdrop" />
     <LayoutGroup id="toplevel" layoutDirection="vert" translation="[100, 100]" itemSpacings="[25]">
       <LayoutGroup layoutDirection="horiz" itemSpacings="[15]">
         <LayoutGroup layoutDirection="vert" itemSpacings="[25]">

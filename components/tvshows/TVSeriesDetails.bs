@@ -17,6 +17,7 @@ sub init()
     m.overview = m.top.findNode("overview")
     m.playedIndicator = m.top.findNode("playedIndicator")
     m.tvshowPoster = m.top.findNode("tvshowPoster")
+    m.backdrop = m.top.findNode("backdrop")
 
     m.overview.ellipsisText = tr("...")
     m.loadStatus = ViewLoadStatus.INIT
@@ -177,6 +178,7 @@ sub itemContentChanged()
     ' Updates video metadata
     item = m.top.itemContent
     itemData = item.json
+    m.backdrop.callFunc("setItem", item)
 
     ' Post image may change. We need to again watch load status
     m.tvshowPoster.observeFieldscoped("loadStatus", "onPosterLoadStatusChanged")
