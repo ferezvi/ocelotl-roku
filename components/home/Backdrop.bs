@@ -136,6 +136,18 @@ function getBackdropUri(item as object) as string
         end if
     end if
 
+    if isStringEqual(item.type, "season")
+        seriesId = item.json.LookupCI("SeriesId")
+
+        if isValidAndNotEmpty(seriesId)
+            return ImageURL(seriesId, ImageType.BACKDROP, {
+                maxHeight: backdropHeight,
+                maxWidth: backdropWidth,
+                quality: "90"
+            })
+        end if
+    end if
+
     if item.type = "Episode" and isValidAndNotEmpty(item.json.seriesid)
         return ImageURL(item.json.seriesid, ImageType.BACKDROP, {
             maxHeight: backdropHeight,
