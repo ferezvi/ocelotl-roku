@@ -109,7 +109,7 @@ function newRect(lg, id as string, styledText = invalid, drawingStyles = invalid
     end if
 
     ' Draw per-line cue background
-    createCueBackgroundBox(rect, lg, styledText, drawingStyles, m.bgColor, m.lineHeights)
+    createCueBackgroundBox(rect, lg, styledText, drawingStyles, m.bgColor, m.lineHeights, m.measureLabel)
     ' Draw outline labels
     createShadowLabels(rect, styledText, drawingStyles, m.textEffect, m.bgColor)
     ' Add main label last so it renders on top of backgrounds and shadows

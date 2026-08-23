@@ -7,6 +7,37 @@ const OUTLINE_STEP_RATIO = 0.085 ' ~8.5% fontSize for cardinal directions
 const OUTLINE_DIAG_RATIO = 0.06 ' ~6% fontSize for diagonals
 const BASE_OFFSET = 5 ' Matches lg.translation in captionTask.bs
 
+' Cache for reconstructed fragments and line widths
+' Structure: { "styledText": { fragments: [], lineWidths: [] } }
+function getCachedFragmentData(styledText as string, drawingStyles as object, measureLabel as object) as object
+    if m.fragmentCache = invalid
+        m.fragmentCache = {}
+    end if
+
+    if m.fragmentCache.DoesExist(styledText)
+        return m.fragmentCache[styledText]
+    end if
+
+    ' Reconstruct fragments
+    fragments = reconstructFragments(styledText)
+
+    ' Measure per-line widths using the shared measureLabel
+    lineWidths = []
+    for each line in fragments
+        measureLabel.drawingStyles = drawingStyles
+        measureLabel.text = line
+        br = measureLabel.boundingRect()
+        lineWidths.push(br.width)
+    end for
+
+    cacheData = {
+        fragments: fragments,
+        lineWidths: lineWidths
+    }
+    m.fragmentCache[styledText] = cacheData
+    return cacheData
+end function
+
 sub createShadowLabels(rect as object, styledText as string, drawingStyles as object, textEffect as string, bgColor as string)
     fontSize = drawingStyles["default"].fontSize
 
@@ -58,9 +89,9 @@ sub createShadowLabels(rect as object, styledText as string, drawingStyles as ob
     end if
 
     ' Use grey shadow when background is fully opaque black, Roku default behavior
-    shadowColor = "0x000000CC"
+    shadowColor = "0x000000FF"
     if isStringEqual(bgColor, "0x000000FF")
-        shadowColor = "0x808080CC"
+        shadowColor = "0x808080FF"
     end if
 
     shadowDrawingStyles = {}
@@ -85,12 +116,14 @@ sub createShadowLabels(rect as object, styledText as string, drawingStyles as ob
 
 end sub
 
-sub createCueBackgroundBox(rect as object, lg as object, styledText as string, drawingStyles as object, bgColor as string, lineHeights as object)
+sub createCueBackgroundBox(rect as object, lg as object, styledText as string, drawingStyles as object, bgColor as string, lineHeights as object, measureLabel as object)
     ' Skip if background is fully transparent
     if bgColor.right(2) = "00" then return
 
-    ' Reconstruct line fragments from styledText — splitting on \n while preserving open tags across lines
-    lineFragments = reconstructFragments(styledText)
+    ' Get cached fragment data (includes fragments and lineWidths)
+    cacheData = getCachedFragmentData(styledText, drawingStyles, measureLabel)
+    lineFragments = cacheData.fragments
+    lineWidths = cacheData.lineWidths
 
     ' Verify the tree is ready and get a reference to the main label for measurement
     mainLabel = invalid
@@ -110,18 +143,6 @@ sub createCueBackgroundBox(rect as object, lg as object, styledText as string, d
     else
         lineHeight = lineHeights.multi
     end if
-
-    ' Measure per-line widths
-    lineWidths = []
-    for each line in lineFragments
-        tempLabel = CreateObject("roSGNode", "MultiStyleLabel")
-        tempLabel.drawingStyles = drawingStyles
-        tempLabel.text = line
-        lg.appendchild(tempLabel)
-        br = tempLabel.boundingRect()
-        lineWidths.push(br.width)
-        lg.removeChild(tempLabel)
-    end for
 
     maxWidth = 0
     for each w in lineWidths
