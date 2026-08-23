@@ -33,6 +33,7 @@ sub init()
     m.bgColorDict = { "Default": "0x000000", "Bright White": "0xFFFFFF", "White": "0xCCCCCC", "Black": "0x000000", "Red": "0xFF0000", "Green": "0x008000", "Blue": "0x0000FF", "Yellow": "0xFFFF00", "Magenta": "0xFF00FF", "Cyan": "0x00FFFF" }
 
     deviceInfo = CreateObject("roDeviceInfo")
+    m.isHD = chainLookupReturn(m.global.device, "isHDDevice", false)
     m.fontSize = chainLookupReturn(m.fontSizeDict, deviceInfo.GetCaptionsOption("Text/Size"), m.fontSizeDict.Default)
     textColor = chainLookupReturn(m.textColorDict, deviceInfo.GetCaptionsOption("Text/Color"), m.textColorDict.Default)
     m.textOpac = chainLookupReturn(m.percentageDict, deviceInfo.GetCaptionsOption("Text/Opacity"), m.percentageDict.Default)
@@ -504,8 +505,22 @@ function getLineHeights() as object
 
     m.top.removeChild(tempGroup)
 
+    single = singleLineHeight
+    multi = twoLinesTotal - singleLineHeight
+
+    ' Round to multiples of 3 on HD devices to ensure pixel-perfect alignment.
+    ' Values not divisible by 3 can cause gaps between background rectangles and shadows.
+    if m.isHD
+        while single mod 3 <> 0
+            single++
+        end while
+        while multi mod 3 <> 0
+            multi++
+        end while
+    end if
+
     return {
-        single: singleLineHeight,
-        multi: twoLinesTotal - singleLineHeight
+        single: single,
+        multi: multi
     }
 end function
