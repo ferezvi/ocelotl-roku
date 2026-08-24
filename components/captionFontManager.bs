@@ -1,0 +1,207 @@
+' captionFontManager.bs
+' Manages Ocelotl packaged font selection based on user preferences
+
+' Maps Roku font preference to Ocelotl family name
+function getPackagedFontFamily(textFont as string) as string
+
+    if textFont = "Small caps"
+        return "OcelotlSansSmallCaps"
+    else if textFont = "Serif proportional" or textFont = "Casual" or textFont = "Cursive" or textFont = "Default"
+        return "OcelotlSerif"
+    else if textFont = "Serif fixed width" or textFont = "Sans serif fixed width"
+        return "OcelotlMono"
+    else if textFont = "Sans serif proportional"
+        return "OcelotlSans"
+    end if
+
+    print textFont
+
+    return "OcelotlSans"
+end function
+
+' Returns font URIs for a given Ocelotl family
+function getPackagedFonts(family as string) as object
+    fonts = {
+        "regular": `pkg:/fonts/${family}-Regular.ttf`,
+        "bold": `pkg:/fonts/${family}-Bold.ttf`,
+        "italic": `pkg:/fonts/${family}-Italic.ttf`,
+        "bolditalic": `pkg:/fonts/${family}-BoldItalic.ttf`
+    }
+
+    if family = "OcelotlMono" or family = "OcelotlSansSmallCaps" or family = "OcelotlSans"
+        fonts.italic = fonts.regular
+        fonts.bolditalic = fonts.bold
+    end if
+
+    return fonts
+end function
+
+' Measures line heights for given fonts using "Ag" sample text
+function measureLineHeights(fonts as object, fontSize as integer, textColor as string, isHD as boolean, topNode as object) as object
+    tempGroup = CreateObject("roSGNode", "Group")
+    testLabel = CreateObject("roSGNode", "MultiStyleLabel")
+    testLabel.drawingStyles = {
+        "default": {
+            "fontUri": fonts.regular,
+            "fontSize": fontSize,
+            "color": textColor
+        }
+    }
+    tempGroup.appendChild(testLabel)
+    topNode.appendChild(tempGroup)
+
+    ' Measure single line
+    testLabel.text = "Ag"
+    single = Int(testLabel.boundingRect().height)
+
+    ' Measure two lines
+    testLabel.text = "Ag" + chr(10) + "Ag"
+    multi = Int(testLabel.boundingRect().height) - single
+
+    topNode.removeChild(tempGroup)
+
+    ' Round to multiples of 3 on HD devices for pixel-perfect alignment
+    if isHD
+        while single mod 3 <> 0
+            single++
+        end while
+        while multi mod 3 <> 0
+            multi++
+        end while
+    end if
+
+    return {
+        single: single,
+        multi: multi
+    }
+end function
+
+' Main function: creates font manager with Ocelotl fonts based on user preference
+function createFontManager(textFontPreference as string, fontSize as integer, textColor as string, isHD as boolean, topNode as object) as object
+    family = getPackagedFontFamily(textFontPreference)
+    fonts = getPackagedFonts(family)
+    lineHeights = measureLineHeights(fonts, fontSize, textColor, isHD, topNode)
+
+    return {
+        fonts: fonts,
+        lineHeights: lineHeights
+    }
+end function
+
+' Temporal: Mide alturas single y multi (interlineado) de SystemFonts, RokuText y OcelotlSans
+function measureFontHeightsExtended(topNode as object, textColor as string) as object
+    result = {
+        systemFonts: {},
+        rokuText: {},
+        ocelotlSans: {}
+    }
+
+    ' SystemFonts a medir (usando su tamaño nativo, sin fontSize)
+    systemFontNames = [
+        "SmallerSystemFont",
+        "SmallSystemFont",
+        "MediumSystemFont",
+        "LargeSystemFont",
+        "LargestSystemFont",
+        "ExtraLargeSystemFont"
+    ]
+
+    ' Medir cada SystemFont (single y multi)
+    for each fontName in systemFontNames
+        tempGroup = CreateObject("roSGNode", "Group")
+        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
+        testLabel.drawingStyles = {
+            "default": {
+                "fontUri": "font:" + fontName,
+                "color": textColor
+            }
+        }
+        tempGroup.appendChild(testLabel)
+        topNode.appendChild(tempGroup)
+
+        ' Medir single
+        testLabel.text = "Ag"
+        single = Int(testLabel.boundingRect().height)
+
+        ' Medir multi (dos líneas)
+        testLabel.text = "Ag" + chr(10) + "Ag"
+        multi = Int(testLabel.boundingRect().height)
+
+        topNode.removeChild(tempGroup)
+
+        result.systemFonts[fontName] = {
+            single: single,
+            multi: multi,
+            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
+        }
+    end for
+
+    ' Tamaños a probar para fuentes empaquetadas
+    testSizes = [30, 40, 50, 60, 70]
+
+    ' Medir RokuText-Regular.otf (single y multi)
+    for each size in testSizes
+        tempGroup = CreateObject("roSGNode", "Group")
+        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
+        testLabel.drawingStyles = {
+            "default": {
+                "fontUri": "pkg:/fonts/RokuText-Regular.otf",
+                "fontSize": size,
+                "color": textColor
+            }
+        }
+        tempGroup.appendChild(testLabel)
+        topNode.appendChild(tempGroup)
+
+        ' Medir single
+        testLabel.text = "Ag"
+        single = Int(testLabel.boundingRect().height)
+
+        ' Medir multi (dos líneas)
+        testLabel.text = "Ag" + chr(10) + "Ag"
+        multi = Int(testLabel.boundingRect().height)
+
+        topNode.removeChild(tempGroup)
+
+        key = size.ToStr()
+        result.rokuText[key] = {
+            single: single,
+            multi: multi,
+            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
+        }
+    end for
+
+    ' Medir OcelotlSans-Regular.ttf (single y multi)
+    for each size in testSizes
+        tempGroup = CreateObject("roSGNode", "Group")
+        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
+        testLabel.drawingStyles = {
+            "default": {
+                "fontUri": "pkg:/fonts/OcelotlSans-Regular.ttf",
+                "fontSize": size,
+                "color": textColor
+            }
+        }
+        tempGroup.appendChild(testLabel)
+        topNode.appendChild(tempGroup)
+
+        ' Medir single
+        testLabel.text = "Ag"
+        single = Int(testLabel.boundingRect().height)
+
+        ' Medir multi (dos líneas)
+        testLabel.text = "Ag" + chr(10) + "Ag"
+        multi = Int(testLabel.boundingRect().height)
+
+        topNode.removeChild(tempGroup)
+
+        key = size.ToStr()
+        result.ocelotlSans[key] = {
+            single: single,
+            multi: multi,
+            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
+        }
+    end for
+
+    return result
+end function

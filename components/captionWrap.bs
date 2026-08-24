@@ -9,7 +9,6 @@ const MAX_BALANCED_LINES = 3
 
 ' Cache for measured text widths to avoid redundant measureCaptionWidth calls
 ' Structure: { "text": width }
-' Note: This is a simple cache; could be enhanced with LRU if needed
 function getCachedWidth(text as string) as integer
     if m.widthCache = invalid
         m.widthCache = {}
@@ -40,10 +39,8 @@ function wrapLongLines(text as string, maxWidth as integer) as string
 end function
 
 ' Balances wrapped caption lines by redistributing words across up to
-' MAX_BALANCED_LINES lines. Originally this only balanced when exactly 2
-' lines were produced; that missed cases where 2 lines were both close to
-' maxWidth and a 3-line split would read better. This version searches for
-' the minimum line count that fits, then balances within that count.
+' MAX_BALANCED_LINES lines. This version searches for the minimum line
+' count that fits, then balances within that count.
 function balanceCaptionLines(text as string, maxWidth as integer) as string
     lines = text.split(Chr(10))
 
@@ -128,8 +125,7 @@ function balanceCaptionLines(text as string, maxWidth as integer) as string
 end function
 
 ' Checks whether words can be greedily wrapped into lineCount lines (or fewer)
-' without exceeding maxWidth on any line.
-' Uses pre-calculated word widths to avoid redundant measurements.
+' without exceeding maxWidth on any line. Uses pre-calculated word widths.
 function canFitInLinesOptimized(words as object, wordWidths as object, lineCount as integer, maxWidth as integer, spaceWidth as integer) as boolean
     linesUsed = 1
     currentWidth = 0
@@ -160,11 +156,9 @@ end function
 
 ' Finds the split of words into exactly lineCount lines that minimizes the
 ' gap between the widest and narrowest line, keeping every line under
-' maxWidth. Brute-forced over split points; cheap given typical caption
-' word counts.
-' Uses pre-calculated segment widths for efficiency.
+' maxWidth. Uses pre-calculated segment widths and texts.
 function findBestSplitOptimized(words as object, lineCount as integer, maxWidth as integer, segmentWidths as object, segmentTexts as object) as object
-    splitCombinations = generateSplitCombinations(words.count(), lineCount, segmentWidths, maxWidth)
+    splitCombinations = generateSplitCombinations(words.count(), lineCount)
 
     bestLines = invalid
     bestScore = invalid
@@ -210,25 +204,18 @@ end function
 
 ' Generates every way to place (lineCount - 1) internal cut points across
 ' wordCount words. E.g. 3 lines / 5 words -> [[1,2,5],[1,3,5],[1,4,5],[2,3,5]...]
-' Now with pruning: only generates combinations where all segments fit in maxWidth
-function generateSplitCombinations(wordCount as integer, lineCount as integer, segmentWidths as object, maxWidth as integer) as object
+function generateSplitCombinations(wordCount as integer, lineCount as integer) as object
     cutsNeeded = lineCount - 1
     combinations = []
 
     if cutsNeeded = 1
         for i = 1 to wordCount - 1
-            ' Prune: first segment must fit, last segment must fit
-            if segmentWidths[0][i - 1] <= maxWidth and segmentWidths[i][wordCount - i - 1] <= maxWidth
-                combinations.push([i, wordCount])
-            end if
+            combinations.push([i, wordCount])
         end for
     else if cutsNeeded = 2
         for i = 1 to wordCount - 2
             for j = i + 1 to wordCount - 1
-                ' Prune: all three segments must fit
-                if segmentWidths[0][i - 1] <= maxWidth and segmentWidths[i][j - i - 1] <= maxWidth and segmentWidths[j][wordCount - j - 1] <= maxWidth
-                    combinations.push([i, j, wordCount])
-                end if
+                combinations.push([i, j, wordCount])
             end for
         end for
     end if
@@ -236,8 +223,9 @@ function generateSplitCombinations(wordCount as integer, lineCount as integer, s
     return combinations
 end function
 
+' Wraps a single line of text (no line breaks) so no visual line exceeds maxWidth.
 function wrapSingleLine(line as string, maxWidth as integer) as string
-    ' Tokenize vs. plain text - single pass
+    ' Tokenize into tags vs. plain text
     tokens = []
     position = 0
     lineLen = line.Len()
@@ -284,8 +272,6 @@ function wrapSingleLine(line as string, maxWidth as integer) as string
     openTags = []
     outputParts = [] ' Use array instead of string concatenation
     currentPlainText = ""
-    currentPlainWidth = 0
-    spaceWidth = getCachedWidth(" ")
 
     for each token in expanded
         if token.type = "tag"
@@ -298,20 +284,13 @@ function wrapSingleLine(line as string, maxWidth as integer) as string
         else if token.type = "space"
             outputParts.push(" ")
             currentPlainText += " "
-            currentPlainWidth += spaceWidth
         else
-            ' token.type = "word"
-            wordWidth = getCachedWidth(token.value)
-
-            ' Calculate total width if we add this word
-            candidateWidth = currentPlainWidth
-            if currentPlainWidth > 0
-                candidateWidth += spaceWidth
-            end if
-            candidateWidth += wordWidth
+            candidateText = currentPlainText + token.value
+            candidateWidth = getCachedWidth(candidateText)
 
             if candidateWidth > maxWidth and currentPlainText.Len() > 0
-                ' Need to break - close tags, add newline, reopen tags
+                ' Close currently open tags, break the line, then reopen
+                ' them so styling continues on the next visual line
                 for i = openTags.count() - 1 to 0 step -1
                     tagName = openTags[i].Mid(1, openTags[i].Len() - 2)
                     spacePos = tagName.Instr(0, " ")
@@ -322,24 +301,20 @@ function wrapSingleLine(line as string, maxWidth as integer) as string
                 for each tag in openTags
                     outputParts.push(tag)
                 end for
-
-                ' Reset current line with this word
                 currentPlainText = token.value
-                currentPlainWidth = wordWidth
                 outputParts.push(token.value)
             else
-                ' Word fits, add it
-                if currentPlainText.Len() > 0
-                    outputParts.push(" ")
-                    currentPlainText += " "
-                    currentPlainWidth += spaceWidth
-                end if
+                ' bs:disable-next-line
+                currentPlainText = candidateText
                 outputParts.push(token.value)
-                currentPlainText += token.value
-                currentPlainWidth += wordWidth
             end if
         end if
     end for
 
     return outputParts.join("")
+end function
+
+' Measures the width of text using m.measureLabel (kept for compatibility)
+function measureCaptionWidth(text as string) as integer
+    return getCachedWidth(text)
 end function
