@@ -1,9 +1,9 @@
 ' captionFontManager.bs
 ' Manages Ocelotl packaged font selection based on user preferences
+' and automatic fallback to system fonts for characters not covered by Ocelotl.
 
 ' Maps Roku font preference to Ocelotl family name
 function getPackagedFontFamily(textFont as string) as string
-
     if textFont = "Small caps"
         return "OcelotlSansSmallCaps"
     else if textFont = "Serif proportional" or textFont = "Casual" or textFont = "Cursive" or textFont = "Default"
@@ -14,8 +14,7 @@ function getPackagedFontFamily(textFont as string) as string
         return "OcelotlSans"
     end if
 
-    print textFont
-
+    print ">>> Unknown font preference: [" + textFont + "], using default OcelotlSans"
     return "OcelotlSans"
 end function
 
@@ -76,132 +75,138 @@ function measureLineHeights(fonts as object, fontSize as integer, textColor as s
     }
 end function
 
-' Main function: creates font manager with Ocelotl fonts based on user preference
-function createFontManager(textFontPreference as string, fontSize as integer, textColor as string, isHD as boolean, topNode as object) as object
-    family = getPackagedFontFamily(textFontPreference)
-    fonts = getPackagedFonts(family)
-    lineHeights = measureLineHeights(fonts, fontSize, textColor, isHD, topNode)
+' Splits a UTF-8 string into individual character sequences.
+' Handles ASCII, accented characters, CJK and other multi-byte characters.
+function utf8SplitChars(text as string) as object
+    chars = []
+    i = 0
+    textLen = Len(text)
 
-    return {
-        fonts: fonts,
-        lineHeights: lineHeights
-    }
+    while i < textLen
+        byte1 = Asc(Mid(text, i + 1, 1))
+
+        if byte1 >= 240
+            sequenceLength = 4
+        else if byte1 >= 224
+            sequenceLength = 3
+        else if byte1 >= 192
+            sequenceLength = 2
+        else
+            sequenceLength = 1
+        end if
+
+        chars.push(Mid(text, i + 1, sequenceLength))
+        i = i + sequenceLength
+    end while
+
+    return chars
 end function
 
-' Temporal: Mide alturas single y multi (interlineado) de SystemFonts, RokuText y OcelotlSans
-function measureFontHeightsExtended(topNode as object, textColor as string) as object
-    result = {
-        systemFonts: {},
-        rokuText: {},
-        ocelotlSans: {}
+
+' Converts a UTF-8 character sequence to its Unicode code point.
+function utf8CodePoint(char as string) as integer
+    length = Len(char)
+
+    b1 = Asc(Mid(char, 1, 1))
+
+    if length = 1
+        return b1
+    end if
+
+    b2 = Asc(Mid(char, 2, 1))
+
+    if length = 2
+        return (b1 and &H1F) * 64 + (b2 and &H3F)
+    end if
+
+    b3 = Asc(Mid(char, 3, 1))
+
+    if length = 3
+        return (b1 and &H0F) * 4096 + (b2 and &H3F) * 64 + (b3 and &H3F)
+    end if
+
+    b4 = Asc(Mid(char, 4, 1))
+
+    return (b1 and &H07) * 262144 + (b2 and &H3F) * 4096 + (b3 and &H3F) * 64 + (b4 and &H3F)
+end function
+
+' Checks if a single character is covered by Ocelotl
+function isCharCovered(codePoint as integer, coverage as object) as boolean
+    if not isValid(coverage) or not isValid(coverage["default"]) or coverage["default"].count() = 0
+        return false
+    end if
+
+    for each range in coverage["default"]
+        if codePoint >= range[0] and codePoint <= range[1]
+            return true
+        end if
+    end for
+
+    return false
+end function
+
+' Checks if any character in text is outside Ocelotl coverage.
+function textNeedsFallback(text as string, coverage as object) as boolean
+    if not isValid(coverage) or not isValid(coverage["default"]) or coverage["default"].count() = 0
+        return true
+    end if
+
+    for each char in utf8SplitChars(text)
+        codePoint = utf8CodePoint(char)
+
+        if not isCharCovered(codePoint, coverage)
+            return true
+        end if
+    end for
+
+    return false
+end function
+
+' Main function: creates font manager with Ocelotl fonts and fallback support
+function createFontManager(textFontPreference as string, fontSize as integer, textColor as string, isHD as boolean, topNode as object, fallbackFonts as object) as object
+    ' Select Ocelotl family based on preference
+    family = getPackagedFontFamily(textFontPreference)
+    ocelotlFonts = getPackagedFonts(family)
+
+    ' Measure line heights for both font types
+    ocelotlLineHeights = measureLineHeights(ocelotlFonts, fontSize, textColor, isHD, topNode)
+    fallbackLineHeights = measureLineHeights(fallbackFonts, fontSize, textColor, isHD, topNode)
+
+    ' Load coverage data from FontCoverage.bs (must be imported separately)
+    coverage = getFontCoverage()
+
+    ' Ensure coverage is valid
+    if not isValid(coverage) or not isValid(coverage["default"])
+        coverage = { "default": [] }
+    end if
+
+    manager = {
+        ocelotlFonts: ocelotlFonts,
+        fallbackFonts: fallbackFonts,
+        ocelotlLineHeights: ocelotlLineHeights,
+        fallbackLineHeights: fallbackLineHeights,
+        coverage: coverage,
+        cache: {}
     }
 
-    ' SystemFonts a medir (usando su tamaño nativo, sin fontSize)
-    systemFontNames = [
-        "SmallerSystemFont",
-        "SmallSystemFont",
-        "MediumSystemFont",
-        "LargeSystemFont",
-        "LargestSystemFont",
-        "ExtraLargeSystemFont"
-    ]
+    return manager
+end function
 
-    ' Medir cada SystemFont (single y multi)
-    for each fontName in systemFontNames
-        tempGroup = CreateObject("roSGNode", "Group")
-        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
-        testLabel.drawingStyles = {
-            "default": {
-                "fontUri": "font:" + fontName,
-                "color": textColor
-            }
-        }
-        tempGroup.appendChild(testLabel)
-        topNode.appendChild(tempGroup)
+' Returns font data for a given text
+' Returns: { fonts: {...}, lineHeights: {...}, needsFallback: boolean }
+function getFontDataForText(manager as object, text as string) as object
+    if manager.cache.DoesExist(text)
+        return manager.cache[text]
+    end if
 
-        ' Medir single
-        testLabel.text = "Ag"
-        single = Int(testLabel.boundingRect().height)
+    needsFallback = textNeedsFallback(text, manager.coverage)
 
-        ' Medir multi (dos líneas)
-        testLabel.text = "Ag" + chr(10) + "Ag"
-        multi = Int(testLabel.boundingRect().height)
+    result = {
+        fonts: needsFallback ? manager.fallbackFonts : manager.ocelotlFonts,
+        lineHeights: needsFallback ? manager.fallbackLineHeights : manager.ocelotlLineHeights,
+        needsFallback: needsFallback
+    }
 
-        topNode.removeChild(tempGroup)
-
-        result.systemFonts[fontName] = {
-            single: single,
-            multi: multi,
-            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
-        }
-    end for
-
-    ' Tamaños a probar para fuentes empaquetadas
-    testSizes = [30, 40, 50, 60, 70]
-
-    ' Medir RokuText-Regular.otf (single y multi)
-    for each size in testSizes
-        tempGroup = CreateObject("roSGNode", "Group")
-        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
-        testLabel.drawingStyles = {
-            "default": {
-                "fontUri": "pkg:/fonts/RokuText-Regular.otf",
-                "fontSize": size,
-                "color": textColor
-            }
-        }
-        tempGroup.appendChild(testLabel)
-        topNode.appendChild(tempGroup)
-
-        ' Medir single
-        testLabel.text = "Ag"
-        single = Int(testLabel.boundingRect().height)
-
-        ' Medir multi (dos líneas)
-        testLabel.text = "Ag" + chr(10) + "Ag"
-        multi = Int(testLabel.boundingRect().height)
-
-        topNode.removeChild(tempGroup)
-
-        key = size.ToStr()
-        result.rokuText[key] = {
-            single: single,
-            multi: multi,
-            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
-        }
-    end for
-
-    ' Medir OcelotlSans-Regular.ttf (single y multi)
-    for each size in testSizes
-        tempGroup = CreateObject("roSGNode", "Group")
-        testLabel = CreateObject("roSGNode", "MultiStyleLabel")
-        testLabel.drawingStyles = {
-            "default": {
-                "fontUri": "pkg:/fonts/OcelotlSans-Regular.ttf",
-                "fontSize": size,
-                "color": textColor
-            }
-        }
-        tempGroup.appendChild(testLabel)
-        topNode.appendChild(tempGroup)
-
-        ' Medir single
-        testLabel.text = "Ag"
-        single = Int(testLabel.boundingRect().height)
-
-        ' Medir multi (dos líneas)
-        testLabel.text = "Ag" + chr(10) + "Ag"
-        multi = Int(testLabel.boundingRect().height)
-
-        topNode.removeChild(tempGroup)
-
-        key = size.ToStr()
-        result.ocelotlSans[key] = {
-            single: single,
-            multi: multi,
-            lineGap: multi - (single * 2) ' Espacio adicional entre líneas
-        }
-    end for
-
+    manager.cache[text] = result
     return result
 end function

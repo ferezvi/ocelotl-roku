@@ -2,6 +2,7 @@ import "pkg:/components/captionFontManager.bs"
 import "pkg:/components/captionParser.bs"
 import "pkg:/components/captionShadow.bs"
 import "pkg:/components/captionWrap.bs"
+import "pkg:/components/FontCoverage.bs"
 import "pkg:/source/api/baserequest.bs"
 import "pkg:/source/enums/CaptionMoveDirection.bs"
 import "pkg:/source/enums/MediaPlaybackState.bs"
@@ -51,10 +52,25 @@ sub init()
     ' Get user font preference from Roku
     textFontPreference = deviceInfo.GetCaptionsOption("Text/Font")
 
-    ' Create font manager with Ocelotl fonts based on user preference
-    ocelotlData = createFontManager(textFontPreference, m.fontSize, m.textColor, m.isHD, m.top)
-    m.fonts = ocelotlData.fonts
-    m.lineHeights = ocelotlData.lineHeights
+    ' Get fallback fonts (from server or system)
+    if isValidAndNotEmpty(m.global.fallbackFont)
+        fallbackFonts = m.global.fallbackFont
+    else
+        fallbackFonts = {
+            "regular": "font:LargeSystemFont",
+            "bold": "font:LargeBoldSystemFont",
+            "italic": "font:LargeSystemFont",
+            "bolditalic": "font:LargeBoldSystemFont"
+        }
+    end if
+
+    ' Create font manager with Ocelotl fonts and fallback support
+    m.fontManager = createFontManager(textFontPreference, m.fontSize, m.textColor, m.isHD, m.top, fallbackFonts)
+
+    ' Get default font data for measure label
+    defaultData = getFontDataForText(m.fontManager, "Ag")
+    m.defaultFonts = defaultData.fonts
+    m.defaultLineHeights = defaultData.lineHeights
 
     ' Hidden label used to measure caption text for word wrapping.
     createMeasureLabel()
@@ -85,7 +101,7 @@ function newLayoutGroup(label)
     return newlg
 end function
 
-function newRect(lg, id as string, styledText = invalid, drawingStyles = invalid)
+function newRect(lg, id as string, styledText = invalid, drawingStyles = invalid, lineHeights = invalid)
     rect = CreateObject("roSGNode", "Rectangle")
     rect.addreplace("id", id)
 
@@ -104,8 +120,12 @@ function newRect(lg, id as string, styledText = invalid, drawingStyles = invalid
         rect.height = 0
     end if
 
+    if not isValid(lineHeights)
+        lineHeights = m.defaultLineHeights
+    end if
+
     ' Draw per-line cue background
-    createCueBackgroundBox(rect, lg, styledText, drawingStyles, m.bgColor, m.lineHeights, m.measureLabel)
+    createCueBackgroundBox(rect, lg, styledText, drawingStyles, m.bgColor, lineHeights, m.measureLabel)
     ' Draw outline labels
     createShadowLabels(rect, styledText, drawingStyles, m.textEffect, m.bgColor)
     ' Add main label last so it renders on top of backgrounds and shadows
@@ -120,7 +140,7 @@ sub createMeasureLabel()
     m.measureGroup = CreateObject("roSGNode", "Group")
     m.measureLabel = CreateObject("roSGNode", "MultiStyleLabel")
     m.measureLabel.drawingStyles = {
-        "default": { "fontUri": m.fonts.regular, "fontSize": m.fontSize, "color": m.textColor }
+        "default": { "fontUri": m.defaultFonts.regular, "fontSize": m.fontSize, "color": m.textColor }
     }
     m.measureGroup.appendChild(m.measureLabel)
     m.top.appendChild(m.measureGroup)
@@ -150,6 +170,20 @@ sub updateCaption()
 
             captionPosition = chainLookupReturn(entry["styles"], "position", string.EMPTY)
 
+            ' Get font data for this specific text (cached)
+            fontData = getFontDataForText(m.fontManager, fullText)
+            captionFonts = fontData.fonts
+            captionLineHeights = fontData.lineHeights
+
+            ' Update measure label to use the correct font for this text
+            m.measureLabel.drawingStyles = {
+                "default": {
+                    "fontUri": captionFonts.regular,
+                    "fontSize": m.fontSize,
+                    "color": m.textColor
+                }
+            }
+
             ' Only wrap captions without explicit position cues.
             ' Balancing now happens inside wrapLongLines (imported from captionWrap.bs).
             if isStringEqual(captionPosition, string.EMPTY)
@@ -158,7 +192,7 @@ sub updateCaption()
 
             ' look for style tags
             currentStyle = {
-                "fontUri": m.fonts.regular,
+                "fontUri": captionFonts.regular,
                 "fontSize": m.fontSize,
                 "color": m.textColor
             }
@@ -261,10 +295,10 @@ sub updateCaption()
                         "fontSize": currentStyle.fontSize,
                         "color": currentStyle.color
                     }
-                    if currentStyle.fontUri = m.fonts.bold
-                        newStyle.fontUri = m.fonts.bolditalic
+                    if currentStyle.fontUri = captionFonts.bold
+                        newStyle.fontUri = captionFonts.bolditalic
                     else
-                        newStyle.fontUri = m.fonts.italic
+                        newStyle.fontUri = captionFonts.italic
                     end if
                     drawingStyles.AddReplace(replaceTagWith, newStyle)
                     currentStyle = newStyle
@@ -276,10 +310,10 @@ sub updateCaption()
                         "fontSize": currentStyle.fontSize,
                         "color": currentStyle.color
                     }
-                    if currentStyle.fontUri = m.fonts.italic
-                        newStyle.fontUri = m.fonts.bolditalic
+                    if currentStyle.fontUri = captionFonts.italic
+                        newStyle.fontUri = captionFonts.bolditalic
                     else
-                        newStyle.fontUri = m.fonts.bold
+                        newStyle.fontUri = captionFonts.bold
                     end if
                     drawingStyles.AddReplace(replaceTagWith, newStyle)
                     currentStyle = newStyle
@@ -331,7 +365,7 @@ sub updateCaption()
             label.horizAlign = "center"
 
             lines = newLayoutGroup(label)
-            rect = newRect(lines, entry.LookupCI("id"), styledText, drawingStyles)
+            rect = newRect(lines, entry.LookupCI("id"), styledText, drawingStyles, captionLineHeights)
             ' Use the post-wrap line count (not the original VTT line count),
             ' since wrapping may have split a line into more visual lines
             wrappedLineCount = styledText.split(Chr(10)).count()
@@ -341,7 +375,7 @@ sub updateCaption()
             adjustForCaptionOverlaps(rect, captions)
 
             ' Create window background
-            windowBg = createWindowBackground(entry.LookupCI("id"), styledText, rect.translation[1], m.windowBgColor, m.lineHeights)
+            windowBg = createWindowBackground(entry.LookupCI("id"), styledText, rect.translation[1], m.windowBgColor, captionLineHeights)
             if isValid(windowBg)
                 captions.push(windowBg)
             end if
