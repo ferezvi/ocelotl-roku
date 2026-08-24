@@ -1,0 +1,281 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/MediaSegmentAction.bs"
+import "pkg:/source/enums/MediaSegmentType.bs"
+import "pkg:/source/utils/misc.bs"
+
+const CHAPTER_EDGE_PERCENT = 10
+
+sub init()
+    m.skipButton = m.top.findNode("skipButton")
+
+    setColors()
+
+    m.currentSegmentEndTicks = 0
+    m.currentSegmentType = invalid
+    m.mediaSegmentDismissed = {}
+
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("playbackState", "onPlaybackStateChanged")
+    m.top.observeField("osdOpen", "onOsdOpenChanged")
+
+    hideSkipButton()
+    m.top.hasActiveSegment = false
+end sub
+
+' ============================================================
+' COLORS
+' ============================================================
+
+' StandardButton's color fields default to empty, so they need to be
+' set explicitly or the button renders as plain white. Uses the user's
+' accent color for focus state and semi-transparent white for background.
+sub setColors()
+    accentColor = getColorWithAlpha("FF") ' User accent color at full opacity
+
+    ' Unfocused state: semi-transparent white background
+    m.skipButton.background = "0xFFFFFF33"
+
+    ' Text always white
+    m.skipButton.color = "0xFFFFFFFF"
+    m.skipButton.focusColor = "0xFFFFFFFF"
+
+    ' Focused state: use user's accent color
+    m.skipButton.focusBackground = accentColor
+end sub
+
+' ------------------------------------------------------------
+' Segment detection
+' ------------------------------------------------------------
+
+sub onPositionChanged()
+    if not isValid(m.top.position) or not isValid(m.top.mediaSegments) then return
+    if m.top.playbackState = "stopped" then return
+    checkSegmentSkipButton(m.top.position)
+end sub
+
+sub checkSegmentSkipButton(position as double)
+    if not isValidAndNotEmpty(m.top.mediaSegments) then return
+
+    matchFound = false
+    currentPositionTicks = int(position) * 10000000&
+
+    for i = 0 to m.top.mediaSegments.TotalRecordCount - 1
+        mediaSegment = m.top.mediaSegments.items[i]
+
+        if currentPositionTicks < mediaSegment.StartTicks then continue for
+        if currentPositionTicks >= (mediaSegment.EndTicks - 50000000) then continue for
+
+        displaySegmentSkipButton(mediaSegment.type, mediaSegment.EndTicks)
+        matchFound = true
+        exit for
+    end for
+
+    if not matchFound
+        hideSkipButton()
+        m.currentSegmentType = invalid
+        m.mediaSegmentDismissed = {}
+        m.top.hasActiveSegment = false
+        m.top.activeSegmentType = ""
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Show/Hide button
+' ------------------------------------------------------------
+
+sub displaySegmentSkipButton(segmentType as string, endticks as double)
+    m.currentSegmentEndTicks = endticks
+    m.currentSegmentType = segmentType
+    m.top.hasActiveSegment = true
+    m.top.activeSegmentType = segmentType
+
+    if isValid(m.mediaSegmentDismissed) and m.mediaSegmentDismissed.DoesExist(segmentType) then return
+
+    userSetting = m.top.userSettings[`playback.mediasegments.${segmentType}`]
+    if isValid(userSetting)
+        if isStringEqual(userSetting, MediaSegmentAction.NONE) then return
+        if isStringEqual(userSetting, MediaSegmentAction.SKIP) and not m.top.isSeeking
+            skipCurrentSegment()
+            return
+        end if
+    end if
+
+    m.skipButton.visible = true
+    m.skipButton.text = tr(`Skip ${segmentType}`)
+    updateSkipButtonFocusStyle()
+end sub
+
+sub hideSkipButton()
+    m.skipButton.visible = false
+    m.skipButton.text = ""
+    m.skipButton.focus = false
+    m.currentSegmentEndTicks = 0
+    m.currentSegmentType = invalid
+    m.top.hasActiveSegment = false
+    m.top.activeSegmentType = ""
+end sub
+
+' ------------------------------------------------------------
+' Execute skip
+' ------------------------------------------------------------
+
+sub skipCurrentSegment()
+    if m.currentSegmentEndTicks = 0 then return
+
+    seekPosition = m.currentSegmentEndTicks / 10000000#
+    if seekPosition > (m.top.duration - 2)
+        m.top.action = { type: "nextItem" }
+        hideSkipButton()
+        return
+    end if
+
+    m.top.action = { type: "seek", position: seekPosition }
+    hideSkipButton()
+end sub
+
+' ------------------------------------------------------------
+' State handling
+' ------------------------------------------------------------
+
+sub onPlaybackStateChanged()
+    if m.top.playbackState = "stopped" or m.top.playbackState = "finished"
+        hideSkipButton()
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Focus / OSD state
+' ------------------------------------------------------------
+
+' While the OSD is closed, the skip button is the only actionable thing
+' on screen, so it's shown highlighted without needing real SceneGraph
+' focus - OK is intercepted directly by VideoInputHandler in that case.
+' While the OSD is open, it starts unhighlighted and only lights up once
+' real D-pad focus reaches it (see focusSkipButton(), called by VideoOsd).
+sub updateSkipButtonFocusStyle()
+    if not m.top.osdOpen
+        m.skipButton.focus = true
+    end if
+end sub
+
+sub onOsdOpenChanged()
+    if m.top.osdOpen
+        m.skipButton.focus = false
+    else
+        clearFocus()
+        updateSkipButtonFocusStyle()
+    end if
+end sub
+
+' Called by VideoOsd when D-pad navigation from VideoControls reaches here
+sub focusSkipButton()
+    m.skipButton.focus = true
+    m.top.setFocus(true)
+end sub
+
+' Called by VideoOsd when navigating back to VideoControls
+sub clearFocus()
+    m.skipButton.focus = false
+    m.top.setFocus(false)
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if isStringEqual(key, KeyCode.OK)
+        skipCurrentSegment()
+        return true
+
+    else if isStringEqual(key, KeyCode.LEFT)
+        return false ' bubble up so VideoOsd can hand focus back to VideoControls
+    end if
+
+    return false
+end function
+
+function getCurrentChapterIndex(position as double) as integer
+    if not isValidAndNotEmpty(m.top.chapters) then return -1
+
+    currentIndex = 0
+
+    for i = m.top.chapters.Count() - 1 to 0 step -1
+        chapterStart = m.top.chapters[i].StartPositionTicks / 10000000#
+
+        if position >= chapterStart
+            currentIndex = i
+            exit for
+        end if
+    end for
+
+    return currentIndex
+end function
+
+function getChapterProgress(position as double, chapterIndex as integer) as double
+    if chapterIndex < 0 or chapterIndex >= m.top.chapters.Count() then return 0
+
+    chapterStart = m.top.chapters[chapterIndex].StartPositionTicks / 10000000#
+
+    if chapterIndex < m.top.chapters.Count() - 1
+        chapterEnd = m.top.chapters[chapterIndex + 1].StartPositionTicks / 10000000#
+    else
+        chapterEnd = m.top.duration
+    end if
+
+    chapterDuration = chapterEnd - chapterStart
+    if chapterDuration <= 0 then return 100
+
+    progress = ((position - chapterStart) / chapterDuration) * 100
+
+    if progress < 0 then progress = 0
+    if progress > 100 then progress = 100
+
+    return progress
+end function
+
+sub previousChapter()
+    if not isValidAndNotEmpty(m.top.chapters)
+        m.top.action = { type: "previousItem" }
+        return
+    end if
+
+    currentIndex = getCurrentChapterIndex(m.top.position)
+    if currentIndex < 0 then return
+
+    progress = getChapterProgress(m.top.position, currentIndex)
+
+    if progress <= 10
+        if currentIndex > 0
+            currentIndex--
+        else
+            m.top.action = { type: "previousItem" }
+            return
+        end if
+    end if
+
+    position = m.top.chapters[currentIndex].StartPositionTicks / 10000000#
+
+    m.top.action = {
+        type: "seek",
+        position: position
+    }
+end sub
+
+sub nextChapter()
+    if not isValidAndNotEmpty(m.top.chapters) then return
+
+    currentIndex = getCurrentChapterIndex(m.top.position)
+    if currentIndex < 0 then return
+
+    if currentIndex >= m.top.chapters.Count() - 1
+        m.top.action = { type: "nextItem" }
+        return
+    end if
+
+    nextIndex = currentIndex + 1
+    position = m.top.chapters[nextIndex].StartPositionTicks / 10000000#
+
+    m.top.action = {
+        type: "seek",
+        position: position
+    }
+end sub

@@ -1,0 +1,888 @@
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' CONSTANTS
+' ============================================================
+
+const SCREEN_WIDTH = 1920
+
+' Limit decoded Trickplay mosaics to the FHD design resolution.
+' Roku automatically scales the SceneGraph UI for HD devices (2/3 factor,
+' e.g. 1920x1080 -> 1280x720), so requesting FHD dimensions here already
+' resolves to the correct native size on HD hardware. Hardcoding a lower
+' value would get scaled down a second time and end up smaller than intended.
+const TRICKPLAY_MAX_MOSAIC_WIDTH = 1920
+const TRICKPLAY_MAX_MOSAIC_HEIGHT = 1080
+
+const TRICKPLAY_BOX_WIDTH = 320
+const TRICKPLAY_BOX_HEIGHT = 180
+
+
+' ============================================================
+' LIFECYCLE
+' ============================================================
+
+sub init()
+    m.trickplayDataFinal = invalid
+
+    m.trickplayBoxBackground = m.top.findNode("trickplayBoxBackground")
+
+    m.trickplayImages = [
+        m.top.findNode("trickplayImage0"),
+        m.top.findNode("trickplayImage1")
+    ]
+
+    m.trickplayActiveBuffer = -1
+    m.trickplayBufferTiles = [-1, -1]
+    m.trickplayBufferLoading = [false, false]
+
+    m.trickplayCurrentTile = -1
+    m.trickplayCurrentThumbnail = -1
+    m.trickplayTargetTile = -1
+    m.trickplayTargetThumbnail = -1
+
+    m.trickplayLastIconIndex = -1
+
+    ' --------------------------------------------------------
+    ' Poster preload state.
+    ' --------------------------------------------------------
+
+    m.trickplayPosterPreloadStarted = false
+    m.trickplayPosterPreloadReady = false
+
+    m.iconInterval = 0
+
+    m.trickplayPriorityTileIndex = -1
+    m.currentPreloadVideoId = ""
+
+    for each trickplayImage in m.trickplayImages
+        trickplayImage.visible = false
+        trickplayImage.observeField("loadStatus", "onTrickplayImageLoadStatusChanged")
+    end for
+
+    ' Only "trickplay" triggers the parse. VideoPlayer always sets videoId
+    ' and resumePosition before trickplay, so by the time this fires both
+    ' are already consistent - observing videoId separately here would
+    ' double-fire onTrickplayDataChanged with half-updated state.
+    m.top.observeField("trickplay", "onTrickplayDataChanged")
+    m.top.observeField("duration", "onTrickplayDurationChanged")
+    m.top.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
+    m.top.observeField("isSeeking", "onTrickplaySeekingChanged")
+
+    ' Trickplay tile preload is now fully owned here - VideoPlayer only
+    ' feeds videoId/trickplay/resumePosition and reads resumeTilesReady.
+    m.preloadTask = CreateObject("roSGNode", "PreloadTrickplayImagesTask")
+    m.preloadTask.observeField("firstTileReady", "onFirstTileReady")
+    m.preloadTask.observeField("priorityTilesReady", "onPriorityTilesReady")
+    m.top.appendChild(m.preloadTask)
+end sub
+
+' ============================================================
+' PUBLIC API
+' ============================================================
+
+sub reset()
+    resetTrickplayBuffers()
+end sub
+
+
+' ============================================================
+' PARENT / PLAYER OSD
+' ============================================================
+
+function getPlayerOSD() as object
+    playerView = m.top.getParent()
+
+    if not isValid(playerView)
+        return invalid
+    end if
+
+    return playerView.findNode("playerOSD")
+end function
+
+
+function getProgressBar() as object
+    playerOSD = getPlayerOSD()
+
+    if not isValid(playerOSD)
+        return invalid
+    end if
+
+    return playerOSD.findNode("progressBar")
+end function
+
+
+' ============================================================
+' TRICKPLAY DATA
+' ============================================================
+
+sub onTrickplayDataChanged()
+    m.trickplayDataFinal = invalid
+    m.iconInterval = 0
+
+    m.trickplayPosterPreloadStarted = false
+    m.trickplayPosterPreloadReady = false
+    m.trickplayPriorityPreloadStarted = false
+    m.trickplayPriorityTileIndex = -1
+
+    videoId = m.top.videoId
+
+    if not isValidAndNotEmpty(videoId)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    ' Cleans up the previous video's cached tiles and updates tracking,
+    ' regardless of whether this video's own trickplay data turns out valid.
+    removePreviousTrickplayCache(videoId)
+
+    trickplay = m.top.trickplay
+
+    if not isValidAndNotEmpty(trickplay)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    trickplayData = trickplay.LookupCI(videoId)
+
+    if not isValidAndNotEmpty(trickplayData)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    keys = trickplayData.keys()
+
+    if keys.count() = 0
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    m.trickplayDataFinal = trickplayData.lookupCI(keys[0])
+
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    if not isValid(m.trickplayDataFinal.Interval)
+        resetTrickplayBuffers()
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    m.iconInterval = m.trickplayDataFinal.Interval / 1000
+
+    resetTrickplayBuffers()
+
+    ' Poster preload no longer starts here. It waits for the preload
+    ' task's firstTileReady (see onFirstTileReady).
+    startTrickplayPreload(videoId, m.trickplayDataFinal)
+end sub
+
+' Issues a REMOVE for the previously cached video's tiles (if different from
+' the one loading now) and updates tracking. Runs unconditionally, even if
+' the new video's own trickplay data later turns out invalid.
+sub removePreviousTrickplayCache(videoId as string)
+    if isValidAndNotEmpty(m.currentPreloadVideoId) and m.currentPreloadVideoId <> videoId
+        m.preloadTask.videoID = m.currentPreloadVideoId
+        m.preloadTask.method = "REMOVE"
+        m.preloadTask.control = TaskControl.RUN
+    end if
+
+    m.currentPreloadVideoId = videoId
+end sub
+
+' Computes the resume-position priority tile (two-pass preload strategy)
+' and kicks off the ADD pass. Guarded against the double-fire that can
+' still happen on the very first load, when trickplay changes before
+' videoId settles.
+sub startTrickplayPreload(videoId as string, data as object)
+    if m.trickplayPreloadStartedFor = videoId
+        return
+    end if
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        m.top.resumeTilesReady = true
+        return
+    end if
+
+    m.trickplayPreloadStartedFor = videoId
+
+    maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
+    priorityTileIndex = -1
+
+    resumePosition = m.top.resumePosition
+
+    if resumePosition > 0 and isValid(data.Interval) and data.Interval > 0
+        iconInterval = data.Interval / 1000
+        iconIndex = fix(resumePosition / iconInterval)
+        priorityTileIndex = fix(iconIndex / thumbnailsPerTile)
+
+        if priorityTileIndex > maxTileIndex
+            priorityTileIndex = maxTileIndex
+        end if
+    end if
+
+    m.trickplayPriorityTileIndex = priorityTileIndex
+
+    m.preloadTask.videoID = videoId
+    m.preloadTask.numImagesToLoad = maxTileIndex
+    m.preloadTask.trickplayWidth = data.Width
+    m.preloadTask.priorityTileIndex = priorityTileIndex
+    m.preloadTask.method = "ADD"
+    m.preloadTask.control = TaskControl.RUN
+end sub
+
+' ============================================================
+' INVISIBLE PRELOAD HELPERS
+' ============================================================
+
+sub configureTrickplayImageForPreload(image as object, data as object)
+    mosaicWidth = data.Width * data.TileWidth
+    mosaicHeight = data.Height * data.TileHeight
+
+    loadMosaicWidth = mosaicWidth
+    loadMosaicHeight = mosaicHeight
+
+    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
+    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
+
+    if loadCapScaleAlt < loadCapScale
+        loadCapScale = loadCapScaleAlt
+    end if
+
+    if loadCapScale < 1.0
+        loadMosaicWidth = mosaicWidth * loadCapScale
+        loadMosaicHeight = mosaicHeight * loadCapScale
+    end if
+
+    image.visible = false
+    image.loadWidth = loadMosaicWidth
+    image.loadHeight = loadMosaicHeight
+    image.width = mosaicWidth
+    image.height = mosaicHeight
+    image.clippingRect = [0, 0, data.Width, data.Height]
+    image.scale = [1.0, 1.0]
+end sub
+
+
+sub onPriorityTilesReady()
+    if not m.preloadTask.priorityTilesReady
+        return
+    end if
+
+    preloadPriorityTrickplayTile()
+
+    ' Always notify, even when there was nothing to prioritize, so
+    ' VideoPlayer's deferred-playback wait never hangs.
+    m.top.resumeTilesReady = true
+end sub
+
+
+sub preloadPriorityTrickplayTile()
+    if m.trickplayPriorityPreloadStarted
+        return
+    end if
+
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    tileIndex = m.trickplayPriorityTileIndex
+
+    ' Tile 0 is already covered by the poster preload in buffer 0.
+    if tileIndex <= 0
+        return
+    end if
+
+    videoId = m.top.videoId
+
+    if not isValidAndNotEmpty(videoId)
+        return
+    end if
+
+    image = m.trickplayImages[1]
+    data = m.trickplayDataFinal
+
+    configureTrickplayImageForPreload(image, data)
+
+    m.trickplayPriorityPreloadStarted = true
+    m.trickplayBufferTiles[1] = tileIndex
+    m.trickplayBufferLoading[1] = true
+
+    image.uri = "tmp:/" + videoId + "-" + tileIndex.ToStr() + ".jpg"
+end sub
+
+sub onTrickplayDurationChanged()
+    if m.top.isSeeking
+        updateTrickplay(m.top.previewPosition)
+    end if
+end sub
+
+
+' ============================================================
+' INVISIBLE POSTER PRELOAD
+' ============================================================
+
+sub onFirstTileReady()
+    if not m.preloadTask.firstTileReady
+        return
+    end if
+
+    preloadFirstTrickplayPoster()
+end sub
+
+
+sub preloadFirstTrickplayPoster()
+    if m.trickplayPosterPreloadStarted
+        return
+    end if
+
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    videoId = m.top.videoId
+
+    if not isValidAndNotEmpty(videoId)
+        return
+    end if
+
+    poster = m.trickplayImages[0]
+
+    data = m.trickplayDataFinal
+
+    mosaicWidth = data.Width * data.TileWidth
+    mosaicHeight = data.Height * data.TileHeight
+
+    loadMosaicWidth = mosaicWidth
+    loadMosaicHeight = mosaicHeight
+
+    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
+    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
+
+    if loadCapScaleAlt < loadCapScale
+        loadCapScale = loadCapScaleAlt
+    end if
+
+    if loadCapScale < 1.0
+        loadMosaicWidth = mosaicWidth * loadCapScale
+        loadMosaicHeight = mosaicHeight * loadCapScale
+    end if
+
+    poster.visible = false
+
+    poster.loadWidth = loadMosaicWidth
+    poster.loadHeight = loadMosaicHeight
+
+    poster.width = mosaicWidth
+    poster.height = mosaicHeight
+
+    poster.clippingRect = [
+        0,
+        0,
+        data.Width,
+        data.Height
+    ]
+
+    poster.scale = [1.0, 1.0]
+
+    m.trickplayPosterPreloadStarted = true
+
+    ' Track this as buffer 0 holding tile 0, currently loading, so
+    ' onTrickplayImageLoadStatusChanged recognizes it when it comes back ready.
+    m.trickplayBufferTiles[0] = 0
+    m.trickplayBufferLoading[0] = true
+
+    poster.uri = "tmp:/" + videoId + "-0.jpg"
+end sub
+
+
+' ============================================================
+' BUFFERS
+' ============================================================
+
+sub resetTrickplayBuffers()
+    m.trickplayBoxBackground.visible = false
+
+    for i = 0 to 1
+        m.trickplayImages[i].visible = false
+        m.trickplayImages[i].uri = ""
+
+        m.trickplayBufferTiles[i] = -1
+        m.trickplayBufferLoading[i] = false
+    end for
+
+    m.trickplayActiveBuffer = -1
+    m.trickplayCurrentTile = -1
+    m.trickplayCurrentThumbnail = -1
+    m.trickplayTargetTile = -1
+    m.trickplayTargetThumbnail = -1
+    m.trickplayLastIconIndex = -1
+
+    ' The data callback will restart preload when appropriate.
+    m.trickplayPosterPreloadStarted = false
+    m.trickplayPosterPreloadReady = false
+end sub
+
+
+function getTrickplayBufferForTile(tileIndex as integer) as integer
+    for i = 0 to 1
+        if m.trickplayBufferTiles[i] = tileIndex and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    return -1
+end function
+
+
+function getTrickplayBufferLoadingTile(tileIndex as integer) as integer
+    for i = 0 to 1
+        if m.trickplayBufferTiles[i] = tileIndex and m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    return -1
+end function
+
+
+function getTrickplayFreeBuffer() as integer
+    for i = 0 to 1
+        if m.trickplayBufferTiles[i] < 0 and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    for i = 0 to 1
+        if i <> m.trickplayActiveBuffer and not m.trickplayBufferLoading[i]
+            return i
+        end if
+    end for
+
+    return -1
+end function
+
+
+' ============================================================
+' LOADING
+' ============================================================
+
+sub loadTrickplayTile(tileIndex as integer, bufferIndex as integer)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    if bufferIndex < 0 or bufferIndex > 1
+        return
+    end if
+
+    if tileIndex < 0
+        return
+    end if
+
+    data = m.trickplayDataFinal
+    trickplayImage = m.trickplayImages[bufferIndex]
+
+    trickplayImage.visible = false
+
+    m.trickplayBufferTiles[bufferIndex] = tileIndex
+    m.trickplayBufferLoading[bufferIndex] = true
+
+    mosaicWidth = data.Width * data.TileWidth
+    mosaicHeight = data.Height * data.TileHeight
+
+    loadMosaicWidth = mosaicWidth
+    loadMosaicHeight = mosaicHeight
+
+    loadCapScale = TRICKPLAY_MAX_MOSAIC_WIDTH / mosaicWidth
+    loadCapScaleAlt = TRICKPLAY_MAX_MOSAIC_HEIGHT / mosaicHeight
+
+    if loadCapScaleAlt < loadCapScale
+        loadCapScale = loadCapScaleAlt
+    end if
+
+    if loadCapScale < 1.0
+        loadMosaicWidth = mosaicWidth * loadCapScale
+        loadMosaicHeight = mosaicHeight * loadCapScale
+    end if
+
+    trickplayImage.loadWidth = loadMosaicWidth
+    trickplayImage.loadHeight = loadMosaicHeight
+
+    trickplayImage.width = mosaicWidth
+    trickplayImage.height = mosaicHeight
+
+    trickplayImage.uri = "tmp:/" + m.top.videoId + "-" + tileIndex.ToStr() + ".jpg"
+end sub
+
+
+' ============================================================
+' NEIGHBOR PRELOADING
+' ============================================================
+
+sub prepareTrickplayNeighbors(tileIndex as integer, tileIconIndex as integer)
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    data = m.trickplayDataFinal
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        return
+    end if
+
+    maxTileIndex = fix((data.ThumbnailCount - 1) / thumbnailsPerTile)
+
+    globalIconIndex = (tileIndex * thumbnailsPerTile) + tileIconIndex
+
+    direction = 0
+
+    if m.trickplayLastIconIndex >= 0
+        if globalIconIndex > m.trickplayLastIconIndex
+            direction = 1
+        else if globalIconIndex < m.trickplayLastIconIndex
+            direction = -1
+        end if
+    end if
+
+    m.trickplayLastIconIndex = globalIconIndex
+
+    if direction = 0
+        return
+    end if
+
+    halfPoint = thumbnailsPerTile / 2
+    neighborTile = -1
+
+    if direction = 1 and tileIconIndex >= halfPoint
+        neighborTile = tileIndex + 1
+    else if direction = -1 and tileIconIndex <= halfPoint
+        neighborTile = tileIndex - 1
+    end if
+
+    if neighborTile < 0 or neighborTile > maxTileIndex
+        return
+    end if
+
+    if getTrickplayBufferForTile(neighborTile) < 0 and getTrickplayBufferLoadingTile(neighborTile) < 0
+        bufferIndex = getTrickplayFreeBuffer()
+
+        if bufferIndex >= 0
+            loadTrickplayTile(neighborTile, bufferIndex)
+        end if
+    end if
+end sub
+
+
+' ============================================================
+' BUFFER SWITCHING
+' ============================================================
+
+sub showTrickplayBuffer(bufferIndex as integer, tileIndex as integer)
+    if bufferIndex < 0 or bufferIndex > 1
+        return
+    end if
+
+    if m.trickplayBufferTiles[bufferIndex] <> tileIndex
+        return
+    end if
+
+    oldBuffer = m.trickplayActiveBuffer
+
+    m.trickplayImages[bufferIndex].visible = true
+    m.trickplayBoxBackground.visible = true
+    m.trickplayActiveBuffer = bufferIndex
+
+    if oldBuffer >= 0 and oldBuffer <> bufferIndex
+        m.trickplayImages[oldBuffer].visible = false
+    end if
+
+    m.trickplayCurrentTile = tileIndex
+end sub
+
+
+' ============================================================
+' MAIN UPDATE
+' ============================================================
+
+function calculateTrickplayBoxFit(data as object) as object
+    scaleX = TRICKPLAY_BOX_WIDTH / data.Width
+    scaleY = TRICKPLAY_BOX_HEIGHT / data.Height
+
+    fitScale = scaleX < scaleY ? scaleX : scaleY
+
+    scaledWidth = data.Width * fitScale
+    scaledHeight = data.Height * fitScale
+
+    return {
+        scale: fitScale,
+        padX: (TRICKPLAY_BOX_WIDTH - scaledWidth) / 2,
+        padY: (TRICKPLAY_BOX_HEIGHT - scaledHeight) / 2
+    }
+end function
+
+
+sub updateTrickplay(trickPosition as float)
+
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    if m.iconInterval <= 0
+        return
+    end if
+
+    if m.top.duration <= 0
+        return
+    end if
+
+    data = m.trickplayDataFinal
+
+    if trickPosition < 0
+        trickPosition = 0
+    else if trickPosition > m.top.duration
+        trickPosition = m.top.duration
+    end if
+
+    iconIndex = fix(trickPosition / m.iconInterval)
+
+    if iconIndex >= data.ThumbnailCount
+        iconIndex = data.ThumbnailCount - 1
+    end if
+
+    if iconIndex < 0
+        iconIndex = 0
+    end if
+
+    thumbnailsPerTile = data.TileHeight * data.TileWidth
+
+    if thumbnailsPerTile <= 0
+        return
+    end if
+
+    tileIndex = fix(iconIndex / thumbnailsPerTile)
+
+    tileIconIndex = iconIndex - (tileIndex * thumbnailsPerTile)
+
+    iconRow = fix(tileIconIndex / data.TileWidth)
+    iconColumn = tileIconIndex mod data.TileWidth
+
+    m.trickplayTargetTile = tileIndex
+    m.trickplayTargetThumbnail = iconIndex
+
+    ' --------------------------------------------------------
+    ' Find requested tile.
+    ' --------------------------------------------------------
+
+    bufferIndex = getTrickplayBufferForTile(tileIndex)
+
+    if bufferIndex < 0
+        loadingBuffer = getTrickplayBufferLoadingTile(tileIndex)
+
+        if loadingBuffer >= 0
+            return
+        end if
+
+        bufferIndex = getTrickplayFreeBuffer()
+
+        if bufferIndex < 0
+            return
+        end if
+
+        ' Tile 0 may already have been preloaded by the invisible Poster.
+        if tileIndex = 0 and m.trickplayPosterPreloadReady
+            m.trickplayBufferTiles[0] = 0
+            m.trickplayBufferLoading[0] = false
+            bufferIndex = 0
+        else
+            loadTrickplayTile(tileIndex, bufferIndex)
+            return
+        end if
+    end if
+
+    ' --------------------------------------------------------
+    ' Calculate preview position.
+    ' --------------------------------------------------------
+
+    previewPosPercentage = 0
+
+    if m.top.duration > 0
+        previewPosPercentage = trickPosition / m.top.duration
+    end if
+
+    if previewPosPercentage < 0
+        previewPosPercentage = 0
+    else if previewPosPercentage > 1
+        previewPosPercentage = 1
+    end if
+
+    progressBar = getProgressBar()
+    playerOSD = getPlayerOSD()
+
+    if not isValid(progressBar) or not isValid(playerOSD)
+        return
+    end if
+
+    trackWidth = progressBar.trackWidth
+
+    fit = calculateTrickplayBoxFit(data)
+
+    boxX = playerOSD.translation[0] + progressBar.translation[0] + (trackWidth * previewPosPercentage) - (TRICKPLAY_BOX_WIDTH / 2)
+    boxY = playerOSD.translation[1] + progressBar.translation[1] - 25 - TRICKPLAY_BOX_HEIGHT
+
+    if boxX < 0
+        boxX = 0
+    else if boxX + TRICKPLAY_BOX_WIDTH > SCREEN_WIDTH
+        boxX = SCREEN_WIDTH - TRICKPLAY_BOX_WIDTH
+    end if
+
+    trickplayImage = m.trickplayImages[bufferIndex]
+
+    trickplayImage.width = data.Width * data.TileWidth
+    trickplayImage.height = data.Height * data.TileHeight
+
+    trickplayImage.clippingRect = [
+        iconColumn * data.Width,
+        iconRow * data.Height,
+        data.Width,
+        data.Height
+    ]
+
+    trickplayImage.scale = [fit.scale, fit.scale]
+
+    trickplayImage.translation = [
+        boxX + fit.padX - (iconColumn * data.Width * fit.scale),
+        boxY + fit.padY - (iconRow * data.Height * fit.scale)
+    ]
+
+    m.trickplayBoxBackground.translation = [boxX, boxY]
+
+    ' --------------------------------------------------------
+    ' Switch buffer.
+    ' --------------------------------------------------------
+
+    if m.trickplayActiveBuffer <> bufferIndex
+        showTrickplayBuffer(bufferIndex, tileIndex)
+    else
+        trickplayImage.visible = true
+        m.trickplayBoxBackground.visible = true
+    end if
+
+    m.trickplayCurrentTile = tileIndex
+    m.trickplayCurrentThumbnail = iconIndex
+
+    prepareTrickplayNeighbors(tileIndex, tileIconIndex)
+end sub
+
+
+' ============================================================
+' IMAGE LOADING
+' ============================================================
+
+sub onTrickplayImageLoadStatusChanged()
+    for i = 0 to 1
+        trickplayImage = m.trickplayImages[i]
+        status = LCase(trickplayImage.loadStatus)
+
+        if status = "ready"
+
+            m.trickplayBufferLoading[i] = false
+
+            tileIndex = m.trickplayBufferTiles[i]
+
+            if i = 0 and tileIndex = 0 and m.trickplayPosterPreloadStarted
+                m.trickplayPosterPreloadReady = true
+            end if
+
+            if m.top.isSeeking
+                updateTrickplay(m.top.previewPosition)
+            end if
+
+            if tileIndex = m.trickplayCurrentTile
+                prepareTrickplayNeighbors(tileIndex, m.trickplayCurrentThumbnail - (tileIndex * (m.trickplayDataFinal.TileHeight * m.trickplayDataFinal.TileWidth)))
+            end if
+
+        else if status = "failed"
+
+            m.trickplayBufferLoading[i] = false
+
+            if i <> m.trickplayActiveBuffer
+                m.trickplayBufferTiles[i] = -1
+                trickplayImage.uri = ""
+            end if
+
+            if i = 0
+                m.trickplayPosterPreloadStarted = false
+                m.trickplayPosterPreloadReady = false
+            end if
+
+            if i = 1
+                m.trickplayPriorityPreloadStarted = false
+            end if
+
+            if m.top.isSeeking
+                updateTrickplay(m.top.previewPosition)
+            end if
+
+        end if
+    end for
+end sub
+
+
+' ============================================================
+' SEEKING
+' ============================================================
+
+sub onTrickplaySeekingChanged()
+    if m.top.isSeeking
+
+        if isValidAndNotEmpty(m.trickplayDataFinal)
+            updateTrickplay(m.top.previewPosition)
+
+            if m.trickplayActiveBuffer >= 0
+                m.trickplayImages[m.trickplayActiveBuffer].visible = true
+                m.trickplayBoxBackground.visible = true
+            end if
+        end if
+
+    else
+
+        if m.trickplayActiveBuffer >= 0
+            m.trickplayImages[m.trickplayActiveBuffer].visible = false
+            m.trickplayBoxBackground.visible = false
+        end if
+
+    end if
+end sub
+
+
+sub onTrickplayPreviewPositionChanged()
+
+    if not m.top.isSeeking
+        return
+    end if
+
+    if not isValidAndNotEmpty(m.trickplayDataFinal)
+        return
+    end if
+
+    updateTrickplay(m.top.previewPosition)
+end sub
+
+sub stopPreload()
+    if isValid(m.preloadTask)
+        m.preloadTask.control = "stop"
+    end if
+end sub

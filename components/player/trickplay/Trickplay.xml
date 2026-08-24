@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="Trickplay" extends="Group">
+
+    <interface>
+        <field id="videoId" type="string" />
+        <field id="trickplay" type="assocarray" />
+        <field id="resumePosition" type="float" value="0" />
+        <field id="duration" type="float" />
+        <field id="previewPosition" type="float" />
+        <field id="isSeeking" type="boolean" />
+        <field id="resumeTilesReady" type="boolean" alwaysNotify="true" />
+        <function name="stopPreload" />
+    </interface>
+
+    <children>
+        <Rectangle id="trickplayBoxBackground" width="320" height="180" color="0x000000FF" visible="false" />
+        <Poster id="trickplayImage0" visible="false" loadDisplayMode="limitSize" />
+        <Poster id="trickplayImage1" visible="false" loadDisplayMode="limitSize" />
+    </children>
+
+</component>

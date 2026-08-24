@@ -1,0 +1,73 @@
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' AUDIO TRACK HANDLER
+' ============================================================
+' Owns audio track selection/switching for VideoPlayer.
+' Expects m.top, m.loadContentTask, m.global.queueManager to be set up
+' by the caller before initAudioTrackHandler() is invoked.
+
+sub initAudioTrackHandler()
+    m.top.observeField("availableAudioTracks", "onAvailableAudioTracksChanged")
+end sub
+
+sub onAvailableAudioTracksChanged()
+    if not isValidAndNotEmpty(m.top.availableAudioTracks)
+        return
+    end if
+
+    preferredAudioTrackName = m.global.queueManager.callFunc("getPreferredAudioTrackName")
+
+    for each audioTrack in m.top.availableAudioTracks
+        trackName = audioTrack.LookupCI("name")
+
+        if isStringEqual(trackName, preferredAudioTrackName)
+            rokuTrackString = audioTrack.LookupCI("Track")
+            rokuTrackIndex = rokuTrackString.toint()
+
+            m.global.queueManager.callFunc("setPreferredAudioTrackIndex", rokuTrackIndex)
+            m.top.audioIndex = rokuTrackIndex
+
+            if m.top.currentAudioTrack = rokuTrackString
+                return
+            end if
+
+            ' Native in-place switch: the container already has this track
+            ' (that's how availableAudioTracks got populated with a name
+            ' match in the first place), so no need to STOP and reload
+            ' the whole content task — that just causes an unnecessary
+            ' rebuffer/restart from the beginning.
+            m.top.audioTrack = rokuTrackString
+            exit for
+        end if
+    end for
+end sub
+
+sub switchAudioTrack(desiredIndex as integer, jellyfinIndex as integer)
+    m.top.selectedAudioIndex = jellyfinIndex
+
+    if desiredIndex = m.top.audioIndex
+        return
+    end if
+
+    reloadWithAudioIndex(desiredIndex)
+end sub
+
+' --------------------------------------------------------
+' Internal helper: stop playback, remember position, reload content
+' with the given audio stream index. Not part of the public handler API.
+' --------------------------------------------------------
+sub reloadWithAudioIndex(audioIndex as integer)
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+
+    m.loadContentTask.selectedAudioStreamIndex = audioIndex
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub

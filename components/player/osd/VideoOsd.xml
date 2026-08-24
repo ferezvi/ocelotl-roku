@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="VideoOsd" extends="Group">
+    <interface>
+        <function name="focusControls" />
+        <function name="focusProgressBar" />
+        <function name="focusOptionControls" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <field id="seekPosition" type="float" />
+        <field id="playbackState" type="string" />
+        <field id="itemId" type="string" />
+        <field id="overview" type="string" />
+        <field id="itemTitle" type="string" />
+        <field id="itemSeason" type="string" />
+        <field id="itemEpisode" type="string" />
+        <field id="itemEpisodeEnd" type="string" />
+        <field id="itemLogo" type="string" />
+        <field id="trickplayData" type="assocarray" />
+        <field id="position" type="float" />
+        <field id="duration" type="float" />
+        <field id="previewPosition" type="float" />
+        <field id="isSeeking" type="boolean" />
+        <function name="seekStep" />
+        <field id="videoId" type="string" />
+
+        <field id="fullAudioData" type="array" />
+        <field id="fullSubtitleData" type="array" />
+        <field id="audioIndex" type="integer" />
+        <field id="selectedSubtitleIndex" type="integer" />
+        <field id="trackSelected" type="assocarray" alwaysNotify="true" />
+        <field id="progressBar" type="node" />
+        <field id="skipSegmentsManager" type="node" onChange="onSkipSegmentsManagerChanged" />
+        <function name="cleanupTimers" />
+    </interface>
+
+    <children>
+        <Poster id="topGradient" uri="pkg:/images/player/top_gradient.png" translation="[0, 0]" width="1920" height="360" />
+        <Poster id="bottomGradient" uri="pkg:/images/player/bottom_gradient.png" translation="[0, 720]" width="1920" height="360" />
+        <VideoOsdTop id="topOSD" />
+        <SynopsisPanel id="synopsisPanel" visible="false" translation="[60, 250]" />
+        <OptionControls id="optionControls" translation="[103, 200]" />
+        <LanguagePanel id="languagePanel" visible="false" />
+        <MediaInfoPanel id="mediaInfoPanel" visible="false" />
+        <ProgressBar id="progressBar" translation="[200, 875]" trackWidth="1520" />
+        <VideoControls id="videoControls" translation="[768, 960]" />
+    </children>
+
+</component>

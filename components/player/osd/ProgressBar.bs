@@ -1,0 +1,329 @@
+import "pkg:/source/enums/ColorPalette.bs"
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/utils/misc.bs"
+
+const TIME_LABEL_TOP_PADDING = 12
+const SEEK_STEP_SECONDS = 10
+const SEEK_STEP_FAST = 20
+const SEEK_STEP_MAX = 30
+const SEEK_HOLD_FAST_THRESHOLD = 6
+const SEEK_HOLD_MAX_THRESHOLD = 14
+
+sub init()
+    m.track = m.top.findNode("track")
+    m.previewForward = m.top.findNode("previewForward")
+    m.fill = m.top.findNode("fill")
+    m.previewErase = m.top.findNode("previewErase")
+    m.currentTime = m.top.findNode("currentTime")
+    m.remainingTime = m.top.findNode("remainingTime")
+
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+    m.segmentMarkerDuration = -1
+
+    m.seekRepeatTimer = CreateObject("roSGNode", "Timer")
+    m.seekRepeatTimer.duration = 0.5
+    m.seekRepeatTimer.repeat = true
+    m.seekRepeatTimer.observeField("fire", "onSeekRepeatTimerFire")
+    m.top.appendChild(m.seekRepeatTimer)
+
+    setColors()
+    onBarUriChanged()
+    updateLayout()
+
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("duration", "onPositionChanged")
+    m.top.observeField("previewPosition", "onPositionChanged")
+    m.top.observeField("isSeeking", "onIsSeekingChanged")
+    m.top.observeField("mediaSegments", "onMediaSegmentsChanged")
+end sub
+
+' Advances the preview position one step in the given direction (1 or -1),
+' accelerating the step size the longer the same direction stays held.
+' Callable externally (e.g. by PlayerView on the very first key press,
+' before this component has focus) or internally on repeat key events.
+sub seekStep(direction as integer)
+    if m.seekDirection <> direction
+        m.seekHoldCount = 0
+        m.seekDirection = direction
+    end if
+    m.seekHoldCount++
+
+    seekStepValue = currentStepSize()
+    newPlayhead = m.top.previewPosition + (direction * seekStepValue)
+
+    if newPlayhead > m.top.duration then newPlayhead = m.top.duration
+    if newPlayhead < 0 then newPlayhead = 0
+
+    ' Set seeking before previewPosition.
+    ' onPositionChanged() resets previewPosition from the real playback position
+    ' while isSeeking is false, so setting previewPosition first would immediately
+    ' overwrite the seek preview with the current playback position.
+    m.top.isSeeking = true
+    m.top.previewPosition = newPlayhead
+
+    ' Only arm the repeat timer if it isn't already running - otherwise
+    ' onSeekRepeatTimerFire's own call to seekStep() would keep resetting
+    ' duration back to 0.5 on every tick and the repeat would never speed up.
+    if m.seekRepeatTimer.control <> "start"
+        m.seekRepeatTimer.duration = 0.5
+        m.seekRepeatTimer.control = "start"
+    end if
+end sub
+
+function currentStepSize() as integer
+    if m.seekHoldCount >= SEEK_HOLD_MAX_THRESHOLD then return SEEK_STEP_MAX
+    if m.seekHoldCount >= SEEK_HOLD_FAST_THRESHOLD then return SEEK_STEP_FAST
+    return SEEK_STEP_SECONDS
+end function
+
+' Fired repeatedly by m.seekRepeatTimer while a direction key is held.
+' Speeds up the repeat rate after the first tick, mirroring the official
+' client's 0.5s -> 0.125s acceleration.
+sub onSeekRepeatTimerFire()
+    if not m.top.hasFocus()
+        stopSeekHold()
+        return
+    end if
+
+    m.top.seekActivity = true
+
+    m.seekRepeatTimer.duration = 0.15
+    seekStep(m.seekDirection)
+end sub
+
+' Stops the hold-to-seek repeat cycle. Does NOT commit the seek -
+' confirmation is still explicit via OK/BACK, matching the official client.
+sub stopSeekHold()
+    m.seekRepeatTimer.control = "stop"
+    m.seekRepeatTimer.duration = 0.5
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+end sub
+
+' Applies the previewed position as the real seek and clears seeking state
+sub commitSeek()
+    if m.top.isSeeking
+        m.top.seek = m.top.previewPosition
+        m.top.isSeeking = false
+    end if
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+end sub
+
+' Discards the preview and restores the real playback position
+sub cancelSeek()
+    m.top.isSeeking = false
+    m.top.previewPosition = m.top.position
+    m.seekHoldCount = 0
+    m.seekDirection = 0
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not m.top.hasFocus() then return false
+
+    if press
+        m.top.keyPressed = true
+        m.top.keyPressed = false
+    end if
+
+    if isStringEqual(key, KeyCode.RIGHT) or isStringEqual(key, KeyCode.FASTFORWRD)
+        if press
+            seekStep(1)
+        else
+            stopSeekHold()
+        end if
+        return true
+
+    else if isStringEqual(key, KeyCode.LEFT) or isStringEqual(key, KeyCode.REWIND)
+        if press
+            seekStep(-1)
+        else
+            stopSeekHold()
+        end if
+        return true
+
+    else if isStringEqual(key, KeyCode.OK) and press
+        if m.top.isSeeking
+            commitSeek()
+            return true
+        end if
+        return false
+
+    else if isStringEqual(key, KeyCode.BACK) and press
+        if m.top.isSeeking
+            cancelSeek()
+            return true
+        end if
+        return false
+    end if
+
+    return false
+end function
+
+sub onBarUriChanged()
+    m.track.uri = m.top.barUri
+    m.previewForward.uri = m.top.barUri
+    m.fill.uri = m.top.barUri
+    m.previewErase.uri = m.top.barUri
+end sub
+
+sub onLayoutFieldsChanged()
+    updateLayout()
+    createSegmentMarkers()
+end sub
+
+sub onPositionChanged()
+    if not m.top.isSeeking
+        m.top.previewPosition = m.top.position
+    end if
+
+    updateLayout()
+
+    if m.segmentMarkerDuration <> m.top.duration
+        createSegmentMarkers()
+    end if
+end sub
+
+sub onIsSeekingChanged()
+    updateLayout()
+end sub
+
+sub updateLayout()
+    m.track.width = m.top.trackWidth
+    m.track.height = m.top.trackHeight
+    m.fill.height = m.top.trackHeight
+
+    m.track.blendColor = m.top.focused ? m.top.focusedTrackColor : m.top.trackColor
+    m.fill.blendColor = m.top.focused ? m.top.focusedFillColor : m.top.fillColor
+
+    m.previewForward.height = m.top.trackHeight
+    m.previewForward.blendColor = m.top.previewFillColor
+
+    m.previewErase.height = m.top.trackHeight
+    m.previewErase.blendColor = m.top.previewEraseColor
+
+    positionRatio = clampRatio(m.top.position, m.top.duration)
+    m.fill.width = m.top.trackWidth * positionRatio
+
+    if m.top.isSeeking
+        previewRatio = clampRatio(m.top.previewPosition, m.top.duration)
+
+        if previewRatio > positionRatio
+            ' Seeking forward: grow from 0, but sit BEHIND fill so only the
+            ' part past the real position peeks out - looks like the new
+            ' color emerges from underneath as you seek.
+            m.previewForward.translation = [0, 0]
+            m.previewForward.width = m.top.trackWidth * previewRatio
+            m.previewForward.opacity = 1
+            m.previewErase.width = 0
+            m.previewErase.opacity = 0
+
+        else if previewRatio < positionRatio
+            ' Seeking backward: sit ON TOP of fill and shrink from the real
+            ' position down to the preview target, painting over the
+            ' progress that would be lost - reads as "erasing" it.
+            m.previewErase.translation = [m.top.trackWidth * previewRatio, 0]
+            m.previewErase.width = m.top.trackWidth * (positionRatio - previewRatio)
+            m.previewForward.width = 0
+            m.previewForward.opacity = 0
+            m.previewErase.opacity = 1
+
+        else
+            m.previewForward.width = 0
+            m.previewForward.opacity = 0
+            m.previewErase.width = 0
+            m.previewErase.opacity = 0
+        end if
+    else
+        m.previewForward.width = 0
+        m.previewForward.opacity = 0
+        m.previewErase.width = 0
+        m.previewErase.opacity = 0
+    end if
+
+    updateTimeLabels(m.top.isSeeking ? m.top.previewPosition : m.top.position)
+end sub
+
+function clampRatio(value as float, total as float) as float
+    if total <= 0 then return 0
+    ratio = value / total
+    if ratio > 1 then ratio = 1
+    if ratio < 0 then ratio = 0
+    return ratio
+end function
+
+' Updates elapsed/remaining time labels below the track. Mirrors the reference
+' OSD: elapsed time uses the live playhead (previewPosition while seeking),
+' remaining time is duration minus that same playhead.
+sub updateTimeLabels(playhead as float)
+    remaining = m.top.duration - playhead
+    if remaining < 0 then remaining = 0
+
+    m.currentTime.text = secondsToHuman(Int(playhead), true)
+    m.remainingTime.text = secondsToHuman(Int(remaining), true)
+
+    labelY = m.top.trackHeight + TIME_LABEL_TOP_PADDING
+    m.currentTime.translation = [0, labelY]
+    m.remainingTime.width = m.top.trackWidth
+    m.remainingTime.translation = [0, labelY]
+end sub
+
+' Pulls the user's configured cursor color (Settings > User Interface > Colors > Cursor)
+' to use as the progress bar's focused accent, falling back to the Ocelotl highlight
+' color when the user hasn't set one. The idle trackColor/fillColor stay as static
+' XML defaults - only the focused state follows the user's chosen accent.
+sub setColors()
+    accent = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)
+
+    m.top.fillColor = toRokuColor(accent, "80") ' idle - dimmed
+    m.top.focusedFillColor = toRokuColor(accent, "FF") ' focused - full opacity
+    m.top.focusedTrackColor = toRokuColor(ColorPalette.WHITE, "33")
+    m.top.previewFillColor = toRokuColor(accent, "B3")
+    m.top.previewEraseColor = toRokuColor(ColorPalette.WHITE, "4D")
+end sub
+
+sub onMediaSegmentsChanged()
+    createSegmentMarkers()
+end sub
+
+sub createSegmentMarkers()
+    ' Clear old markers only (id "SegmentMarker"). Markers live directly under
+    ' m.top (not m.track) so they render on top of track/fill/preview layers -
+    ' otherwise fill's color would paint over them.
+    childCount = m.top.getChildCount()
+    for i = childCount - 1 to 0 step -1
+        child = m.top.getChild(i)
+        if isValid(child) and child.id = "SegmentMarker"
+            m.top.removeChild(child)
+        end if
+    end for
+
+    m.segmentMarkerDuration = -1
+
+    if not isValidAndNotEmpty(m.top.mediaSegments) or m.top.duration <= 0 then return
+
+    barWidth = m.top.trackWidth
+
+    for i = 0 to m.top.mediaSegments.TotalRecordCount - 1
+        startPos = cint(m.top.mediaSegments.items[i].StartTicks / 10000000)
+        endPos = cint(m.top.mediaSegments.items[i].EndTicks / 10000000)
+
+        markerStart = (startPos / m.top.duration) * barWidth
+        markerWidth = ((endPos / m.top.duration) * barWidth) - markerStart
+
+        ' Reuse the same pill-shaped 9-patch as track/fill so markers get
+        ' rounded caps for free instead of square Rectangle corners.
+        marker = CreateObject("roSGNode", "Poster")
+        marker.id = "SegmentMarker"
+        marker.uri = m.top.barUri
+        marker.width = markerWidth
+        marker.height = m.top.trackHeight
+        marker.blendColor = "0xFFFFFF80" ' white @ ~50% opacity, same look as before
+        marker.translation = [markerStart, 0]
+
+        m.top.appendChild(marker)
+    end for
+
+    m.segmentMarkerDuration = m.top.duration
+end sub

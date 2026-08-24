@@ -1,0 +1,73 @@
+import "pkg:/source/utils/misc.bs"
+
+const LOGO_RIGHT_PADDING = 30
+
+sub init()
+    m.videoInfo = m.top.findNode("videoInfo")
+    m.itemTitleLabel = m.top.findNode("itemTitleLabel")
+    m.itemSeasonLabel = m.top.findNode("itemSeasonLabel")
+    m.itemEpisodeLabel = m.top.findNode("itemEpisodeLabel")
+    m.itemEpisodeEndLabel = m.top.findNode("itemEpisodeEndLabel")
+    m.logoPoster = m.top.findNode("logoImagePoster")
+
+    m.top.observeField("itemTitle", "onItemTitleChanged")
+    m.top.observeField("itemSubtitle", "onSubtitleChanged")
+    m.top.observeField("itemSeason", "onSeasonChanged")
+    m.top.observeField("itemEpisode", "onEpisodeChanged")
+    m.top.observeField("itemEpisodeEnd", "onEpisodeEndChanged")
+    m.logoPoster.observeField("loadStatus", "onLogoLoadStatusChanged")
+    m.top.observeField("itemLogo", "onLogoChanged")
+end sub
+
+sub onItemTitleChanged()
+    m.itemTitleLabel.text = m.top.itemTitle
+end sub
+
+sub onSubtitleChanged()
+    if isValidAndNotEmpty(m.top.itemSubtitle)
+        m.itemSeasonLabel.text = m.top.itemSubtitle
+    end if
+end sub
+
+sub onSeasonChanged()
+    if isValidAndNotEmpty(m.top.itemSeason)
+        m.itemSeasonLabel.text = `S${m.top.itemSeason}`
+    end if
+end sub
+
+sub onEpisodeChanged()
+    if isValidAndNotEmpty(m.top.itemEpisode)
+        m.itemEpisodeLabel.text = `E${m.top.itemEpisode}`
+    end if
+end sub
+
+sub onEpisodeEndChanged()
+    if isValidAndNotEmpty(m.top.itemEpisodeEnd)
+        m.itemEpisodeEndLabel.text = `-${m.top.itemEpisodeEnd}`
+    end if
+end sub
+
+sub onLogoChanged()
+    if not isValidAndNotEmpty(m.top.itemLogo)
+        m.logoPoster.visible = false
+        return
+    end if
+
+    m.logoPoster.uri = m.top.itemLogo
+    m.logoPoster.visible = true
+end sub
+
+sub onLogoLoadStatusChanged(event)
+    if event.getData() <> "ready"
+        return
+    end if
+
+    logoWidth = m.logoPoster.bitmapWidth
+
+    m.videoInfo.translation = [
+        103 + logoWidth + LOGO_RIGHT_PADDING,
+        61
+    ]
+
+    m.itemTitleLabel.maxWidth = 1400 - logoWidth - LOGO_RIGHT_PADDING
+end sub

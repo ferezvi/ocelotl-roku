@@ -1,0 +1,99 @@
+import "pkg:/source/enums/MediaPlaybackState.bs"
+
+sub init()
+    m.row = m.top.findNode("row")
+
+    m.buttons = [
+        m.top.findNode("skipBackButton"),
+        m.top.findNode("rewindButton"),
+        m.top.findNode("playPauseButton"),
+        m.top.findNode("fastForwardButton"),
+        m.top.findNode("skipForwardButton")
+    ]
+
+    m.currentIndex = 2
+
+    m.top.observeField("itemSpacing", "onItemSpacingChanged")
+    m.top.observeField("playbackState", "onPlaybackStateChanged")
+
+    for each btn in m.buttons
+        btn.observeFieldScoped("buttonSelected", "onChildButtonSelected")
+    end for
+end sub
+
+sub onItemSpacingChanged()
+    m.row.itemSpacings = [m.top.itemSpacing]
+end sub
+
+sub focusControls()
+    setFocusedIndex(2)
+end sub
+
+sub setFocusedIndex(index as integer)
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+    end if
+
+    m.currentIndex = index
+    target = m.buttons[m.currentIndex]
+
+    target.focused = true
+    target.setFocus(true)
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if press
+        m.top.keyPressed = true
+        m.top.keyPressed = false
+    end if
+
+    if key = "right"
+        if m.currentIndex < m.buttons.Count() - 1
+            setFocusedIndex(m.currentIndex + 1)
+            return true
+        end if
+
+        return false ' bubble up so a sibling to the right can take focus
+
+    else if key = "left"
+        if m.currentIndex > 0
+            setFocusedIndex(m.currentIndex - 1)
+            return true
+        end if
+
+        return false ' bubble up so OptionControls can take focus
+    end if
+
+    return false
+end function
+
+sub onChildButtonSelected(event as object)
+    node = event.getRoSGNode()
+
+    if event.getData() = true
+        m.top.action = node.id
+    end if
+end sub
+
+sub onPlaybackStateChanged()
+    playPauseButton = m.buttons[2]
+
+    if m.top.playbackState = MediaPlaybackState.PLAYING
+        playPauseButton.icon = "pkg:/images/player/pause.png"
+    else if m.top.playbackState = MediaPlaybackState.PAUSED
+        playPauseButton.icon = "pkg:/images/player/play.png"
+    end if
+end sub
+
+sub clearFocus()
+    if m.currentIndex >= 0 and m.currentIndex < m.buttons.Count()
+        m.buttons[m.currentIndex].focused = false
+        m.buttons[m.currentIndex].setFocus(false)
+    end if
+end sub
+
+sub focusFirst()
+    setFocusedIndex(0)
+end sub

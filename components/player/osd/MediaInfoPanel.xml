@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="MediaInfoPanel" extends="Group">
+    <interface>
+        <field id="lines" type="array" />
+        <field id="keyPressed" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <Rectangle id="background" color="0x000000E6" translation="[1280, 0]" width="640" height="1080" />
+        <LayoutGroup id="linesContainer" layoutDirection="vert" itemSpacings="[12]" translation="[1330, 90]" />
+    </children>
+</component>

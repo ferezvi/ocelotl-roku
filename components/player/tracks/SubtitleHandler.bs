@@ -1,0 +1,162 @@
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' SUBTITLE HANDLER
+' ============================================================
+
+sub initSubtitleHandler()
+    m.top.observeField("SelectedSubtitle", "onSubtitleChange")
+    m.top.observeField("allowCaptions", "onAllowCaptionsChange")
+    setupCaptionInfra()
+end sub
+
+' ============================================================
+' SUBTITLE TRACK SELECTION
+' ============================================================
+
+sub applySubtitleContent(item as object)
+    m.top.unobserveField("SelectedSubtitle")
+
+    selectedSubtitleIndex = isValid(item.SelectedSubtitle) ? item.SelectedSubtitle : SubtitleSelection.NOTSET
+
+    m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(selectedSubtitleIndex, item.fullSubtitleData)
+
+    if m.top.SelectedSubtitle <> selectedSubtitleIndex
+        m.top.SelectedSubtitle = selectedSubtitleIndex
+    end if
+
+    m.top.observeField("SelectedSubtitle", "onSubtitleChange")
+end sub
+
+function applySubtitleTrackFields(subtitleIndex as dynamic, subtitleData as object) as boolean
+    selectedSubtitle = invalid
+
+    for each subtitle in subtitleData
+        if subtitle.Index = subtitleIndex
+            selectedSubtitle = subtitle
+            exit for
+        end if
+    end for
+
+    if subtitleIndex = SubtitleSelection.NONE
+        m.top.globalCaptionMode = "Off"
+
+    else if isValid(selectedSubtitle) and not selectedSubtitle.IsEncoded
+        availableSubtitleTrackIndex = availSubtitleTrackIdx(selectedSubtitle.Track.TrackName)
+
+        if availableSubtitleTrackIndex <> SubtitleSelection.NONE
+            m.top.globalCaptionMode = "On"
+            m.top.subtitleTrack = m.top.availableSubtitleTracks[availableSubtitleTrackIndex].TrackName
+        end if
+    end if
+
+    if not isValid(selectedSubtitle)
+        return false
+    end if
+
+    return selectedSubtitle.IsEncoded
+end function
+
+sub onSubtitleChange()
+    switchWithoutRefresh = true
+
+    if m.top.SelectedSubtitle <> SubtitleSelection.NONE
+        if LCase(m.top.globalCaptionMode) <> "on"
+            switchWithoutRefresh = false
+        end if
+    end if
+
+    if m.top.previousSubtitleWasEncoded
+        switchWithoutRefresh = false
+    end if
+
+    if switchWithoutRefresh
+        m.top.previousSubtitleWasEncoded = false
+        return
+    end if
+
+    reloadWithSubtitleIndex(m.top.SelectedSubtitle)
+end sub
+
+function availSubtitleTrackIdx(trackNameToFind as string) as integer
+    idx = 0
+
+    for each availTrack in m.top.availableSubtitleTracks
+        if Instr(1, availTrack.TrackName, trackNameToFind)
+            return idx
+        end if
+
+        idx = idx + 1
+    end for
+
+    return SubtitleSelection.NONE
+end function
+
+sub reloadWithSubtitleIndex(subtitleIndex as dynamic)
+    if m.top.position <> 0
+        m.global.queueManager.callFunc("setTopStartingPoint", int(m.top.position) * 10000000&)
+    end if
+
+    m.top.control = VideoControl.STOP
+
+    m.loadContentTask.selectedSubtitleIndex = subtitleIndex
+    m.loadContentTask.itemId = m.top.id
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+end sub
+
+' ============================================================
+' CUSTOM CAPTIONS (burn-in overlay) - VERSIÓN SIMPLIFICADA
+' ============================================================
+
+sub setupCaptionInfra()
+    m.captionGroup = m.top.findNode("captionGroup")
+    m.captionGroup.createchildren(9, "LayoutGroup")
+
+    m.captionTask = createObject("roSGNode", "captionTask")
+    m.top.appendChild(m.captionTask)
+    m.captionTask.observeField("currentCaption", "updateCaption")
+
+    m.top.observeField("subtitleTrack", "loadCaption")
+    m.top.observeField("globalCaptionMode", "toggleCaption")
+end sub
+
+sub onAllowCaptionsChange()
+    if not m.top.allowCaptions
+        return
+    end if
+
+    customSubsEnabled = m.global.session.user.settings["playback.subs.custom"]
+
+    if customSubsEnabled
+        m.top.suppressCaptions = true
+        toggleCaption()
+    else
+        m.top.suppressCaptions = false
+    end if
+end sub
+
+sub loadCaption()
+    if m.top.suppressCaptions
+        m.captionTask.url = m.top.subtitleTrack
+    end if
+end sub
+
+sub toggleCaption()
+    m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
+
+    if LCase(m.top.globalCaptionMode) = "on"
+        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode + "w"
+        m.captionGroup.visible = true
+    else
+        m.captionGroup.visible = false
+    end if
+end sub
+
+sub updateCaption()
+    m.captionGroup.removeChildrenIndex(m.captionGroup.getChildCount(), 0)
+    m.captionGroup.appendChildren(m.captionTask.currentCaption)
+end sub
