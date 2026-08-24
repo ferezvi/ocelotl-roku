@@ -25,6 +25,7 @@ sub init()
     m.captionTimer.ObserveField("fire", "updateCaption")
 
     m.captionList = []
+    m.lastRenderedCaptionKey = string.EMPTY
     m.reader = createObject("roUrlTransfer")
     m.fontColor = CreateObject("roRegex", "color\s*=\s*(""[^""]*""|\'[^\']*\'|[^\s]+)", "i")
 
@@ -85,6 +86,7 @@ sub fetchCaption()
         m.reader.setUrl(url)
         text = m.reader.GetToString()
         m.captionList = parseVTT(text)
+        m.lastRenderedCaptionKey = string.EMPTY
         m.captionTimer.control = "start"
     else
         m.captionTimer.control = "stop"
@@ -146,6 +148,19 @@ sub createMeasureLabel()
     m.top.appendChild(m.measureGroup)
 end sub
 
+function getActiveCaptionKey(entries as object) as string
+    ids = []
+
+    for each entry in entries
+        id = entry.LookupCI("id")
+        if isValid(id)
+            ids.push(id)
+        end if
+    end for
+
+    return ids.Join("|")
+end function
+
 sub updateCaption()
     if LCase(m.top.playerState.right(1)) = "w"
         m.top.playerState = m.top.playerState.left(len (m.top.playerState) - 1)
@@ -155,233 +170,248 @@ sub updateCaption()
     ' Keep last captions visible while paused instead of clearing them.
     if isStringEqual(m.top.playerState, "pausedon") then return
 
-    m.top.currentCaption = []
-
     if not isStringEqual(m.top.playerState, "playingon") then return
 
     m.top.currentPos = m.top.currentPos + 100
-    captions = []
+    activeEntries = []
 
     for each entry in m.captionList
-        if entry["text"].count() = 0 then continue for ' Guard against empty text blocks
+        if entry["text"].count() = 0 then continue for
+
         if entry["start"] <= m.top.currentPos and m.top.currentPos < entry["end"]
+            activeEntries.push(entry)
+        end if
+    end for
 
-            fullText = entry["text"].Join(Chr(10))
-            fullText = removeVariationSelectors(fullText)
+    activeCaptionKey = getActiveCaptionKey(activeEntries)
 
-            captionPosition = chainLookupReturn(entry["styles"], "position", string.EMPTY)
+    if activeCaptionKey = m.lastRenderedCaptionKey
+        return
+    end if
 
-            ' Get font data for this specific text (cached)
-            fontData = getFontDataForText(m.fontManager, fullText)
-            captionFonts = fontData.fonts
-            captionLineHeights = fontData.lineHeights
+    m.lastRenderedCaptionKey = activeCaptionKey
+    m.top.currentCaption = []
 
-            ' Update measure label to use the correct font for this text
-            m.measureLabel.drawingStyles = {
-                "default": {
-                    "fontUri": captionFonts.regular,
-                    "fontSize": m.fontSize,
-                    "color": m.textColor
-                }
-            }
+    captions = []
 
-            ' Only wrap captions without explicit position cues.
-            ' Balancing now happens inside wrapLongLines (imported from captionWrap.bs).
-            if isStringEqual(captionPosition, string.EMPTY)
-                fullText = wrapLongLines(fullText, SAFE_TEXT_WIDTH)
-            end if
+    for each entry in activeEntries
 
-            ' look for style tags
-            currentStyle = {
+        fullText = entry["text"].Join(Chr(10))
+        fullText = removeVariationSelectors(fullText)
+
+        captionPosition = chainLookupReturn(entry["styles"], "position", string.EMPTY)
+
+        ' Get font data for this specific text (cached)
+        fontData = getFontDataForText(m.fontManager, fullText)
+        captionFonts = fontData.fonts
+        captionLineHeights = fontData.lineHeights
+
+        ' Update measure label to use the correct font for this text
+        m.measureLabel.drawingStyles = {
+            "default": {
                 "fontUri": captionFonts.regular,
                 "fontSize": m.fontSize,
                 "color": m.textColor
             }
-            drawingStyles = {
-                "default": currentStyle
-            }
-            openTags = []
-            tagNumber = 0
-            styledText = string.EMPTY
-            parts = fullText.Split("<")
-            firstIter = true
-            for each part in parts
-                if firstIter
-                    ' first part will either be "" if it starts with a tag,
-                    ' or plain text before the first tag, so just add it and continue
-                    styledText += part
-                    firstIter = false
-                    continue for
-                end if
-                tagEnd = part.Instr(0, ">")
-                nextNewLine = part.Instr(0, Chr(10))
-                if tagEnd = -1 or (nextNewLine <> -1 and nextNewLine < tagEnd)
-                    ' no end bracket on the same line - treat as literal less-than sign
-                    styledText += `<${part}`
-                    continue for
-                end if
-                tagValue = LCase(part.Mid(0, tagEnd).Trim())
-                replaceTagWith = string.EMPTY
-                if tagValue.StartsWith("font")
-                    ' opening font tag
-                    colorName = invalid
-                    color = m.fontColor.Match(tagValue)
-                    if color.Count() > 1
-                        color = color[1].Replace("'", string.EMPTY).Replace("""", string.EMPTY).Trim()
-                        if color.StartsWith("#")
-                            ' hex color code (must be 3 or 6 digits)
-                            sanitizedColor = "#"
-                            colorChars = color.Mid(1).Split(string.EMPTY)
-                            isShortColor = colorChars.Count() = 3
-                            for each c in colorChars
-                                if c >= "0" and c <= "9" or c >= "a" and c <= "f"
+        }
+
+        ' Only wrap captions without explicit position cues.
+        ' Balancing now happens inside wrapLongLines (imported from captionWrap.bs).
+        if isStringEqual(captionPosition, string.EMPTY)
+            fullText = wrapLongLines(fullText, SAFE_TEXT_WIDTH)
+        end if
+
+        ' look for style tags
+        currentStyle = {
+            "fontUri": captionFonts.regular,
+            "fontSize": m.fontSize,
+            "color": m.textColor
+        }
+        drawingStyles = {
+            "default": currentStyle
+        }
+        openTags = []
+        tagNumber = 0
+        styledText = string.EMPTY
+        parts = fullText.Split("<")
+        firstIter = true
+        for each part in parts
+            if firstIter
+                ' first part will either be "" if it starts with a tag,
+                ' or plain text before the first tag, so just add it and continue
+                styledText += part
+                firstIter = false
+                continue for
+            end if
+            tagEnd = part.Instr(0, ">")
+            nextNewLine = part.Instr(0, Chr(10))
+            if tagEnd = -1 or (nextNewLine <> -1 and nextNewLine < tagEnd)
+                ' no end bracket on the same line - treat as literal less-than sign
+                styledText += `<${part}`
+                continue for
+            end if
+            tagValue = LCase(part.Mid(0, tagEnd).Trim())
+            replaceTagWith = string.EMPTY
+            if tagValue.StartsWith("font")
+                ' opening font tag
+                colorName = invalid
+                color = m.fontColor.Match(tagValue)
+                if color.Count() > 1
+                    color = color[1].Replace("'", string.EMPTY).Replace("""", string.EMPTY).Trim()
+                    if color.StartsWith("#")
+                        ' hex color code (must be 3 or 6 digits)
+                        sanitizedColor = "#"
+                        colorChars = color.Mid(1).Split(string.EMPTY)
+                        isShortColor = colorChars.Count() = 3
+                        for each c in colorChars
+                            if c >= "0" and c <= "9" or c >= "a" and c <= "f"
+                                sanitizedColor += c
+                                if isShortColor
                                     sanitizedColor += c
-                                    if isShortColor
-                                        sanitizedColor += c
-                                    end if
-                                end if
-                            end for
-                            if sanitizedColor.Len() = 7
-                                color = sanitizedColor
-                                colorName = color
-                            end if
-                        else if color.StartsWith("rgb(") or color.StartsWith("rgba(")
-                            ' rgb or rgba color code (alpha is ignored)
-                            rgbValues = color.Mid(color.Instr("(") + 1).Replace(")", string.EMPTY).Split(",")
-                            if rgbValues.Count() >= 3
-                                r = rgbValues[0].Trim()
-                                g = rgbValues[1].Trim()
-                                b = rgbValues[2].Trim()
-                                ' verify they're numbers
-                                ' can't rely on val() because it returns 0 and the text will end up black
-                                if r.Left(1) >= "0" and r.Left(1) <= "9" and g.Left(1) >= "0" and g.Left(1) <= "9" and b.Left(1) >= "0" and b.Left(1) <= "9"
-                                    r = val(r, 10)
-                                    g = val(g, 10)
-                                    b = val(b, 10)
-                                    if r >= 0 and r <= 255 and g >= 0 and g <= 255 and b >= 0 and b <= 255
-                                        color = "#%02x%02x%02x".Format(r, g, b)
-                                        colorName = color
-                                    end if
                                 end if
                             end if
-                        else
-                            ' is it the name of a color?
-                            cssColor = chainLookup(m.global.constants.cssColorDict, color)
-                            if isValid(cssColor)
-                                colorName = color
-                                color = cssColor
+                        end for
+                        if sanitizedColor.Len() = 7
+                            color = sanitizedColor
+                            colorName = color
+                        end if
+                    else if color.StartsWith("rgb(") or color.StartsWith("rgba(")
+                        ' rgb or rgba color code (alpha is ignored)
+                        rgbValues = color.Mid(color.Instr("(") + 1).Replace(")", string.EMPTY).Split(",")
+                        if rgbValues.Count() >= 3
+                            r = rgbValues[0].Trim()
+                            g = rgbValues[1].Trim()
+                            b = rgbValues[2].Trim()
+                            ' verify they're numbers
+                            ' can't rely on val() because it returns 0 and the text will end up black
+                            if r.Left(1) >= "0" and r.Left(1) <= "9" and g.Left(1) >= "0" and g.Left(1) <= "9" and b.Left(1) >= "0" and b.Left(1) <= "9"
+                                r = val(r, 10)
+                                g = val(g, 10)
+                                b = val(b, 10)
+                                if r >= 0 and r <= 255 and g >= 0 and g <= 255 and b >= 0 and b <= 255
+                                    color = "#%02x%02x%02x".Format(r, g, b)
+                                    colorName = color
+                                end if
                             end if
                         end if
-                        if isValid(colorName)
-                            tagNumber++
-                            replaceTagWith += `tag${tagNumber}`
-                            newStyle = {
-                                "fontUri": currentStyle.fontUri,
-                                "fontSize": currentStyle.fontSize,
-                                "color": `${color}${m.textOpac}`
-                            }
-                            drawingStyles.AddReplace(replaceTagWith, newStyle)
-                            currentStyle = newStyle
+                    else
+                        ' is it the name of a color?
+                        cssColor = chainLookup(m.global.constants.cssColorDict, color)
+                        if isValid(cssColor)
+                            colorName = color
+                            color = cssColor
                         end if
                     end if
-                    ' keep track of invalid tags
-                    if not isValid(replaceTagWith)
+                    if isValid(colorName)
+                        tagNumber++
+                        replaceTagWith += `tag${tagNumber}`
+                        newStyle = {
+                            "fontUri": currentStyle.fontUri,
+                            "fontSize": currentStyle.fontSize,
+                            "color": `${color}${m.textOpac}`
+                        }
+                        drawingStyles.AddReplace(replaceTagWith, newStyle)
+                        currentStyle = newStyle
+                    end if
+                end if
+                ' keep track of invalid tags
+                if not isValid(replaceTagWith)
+                    openTags.push(replaceTagWith)
+                end if
+            else if tagValue = "i"
+                ' opening italic tag
+                tagNumber++
+                replaceTagWith = `tag${tagNumber}`
+                newStyle = {
+                    "fontSize": currentStyle.fontSize,
+                    "color": currentStyle.color
+                }
+                if currentStyle.fontUri = captionFonts.bold
+                    newStyle.fontUri = captionFonts.bolditalic
+                else
+                    newStyle.fontUri = captionFonts.italic
+                end if
+                drawingStyles.AddReplace(replaceTagWith, newStyle)
+                currentStyle = newStyle
+            else if tagValue = "b"
+                ' opening bold tag
+                tagNumber++
+                replaceTagWith = `tag${tagNumber}`
+                newStyle = {
+                    "fontSize": currentStyle.fontSize,
+                    "color": currentStyle.color
+                }
+                if currentStyle.fontUri = captionFonts.italic
+                    newStyle.fontUri = captionFonts.bolditalic
+                else
+                    newStyle.fontUri = captionFonts.bold
+                end if
+                drawingStyles.AddReplace(replaceTagWith, newStyle)
+                currentStyle = newStyle
+            else if tagValue.StartsWith("/")
+                ' closing tag
+                if openTags.Count() > 0
+                    openTag = openTags.pop()
+                    if isValid(openTag)
+                        replaceTagWith = `/${openTag}`
+                    end if
+                end if
+            end if
+            if replaceTagWith.Len() > 0
+                ' MultiStyleLabel doesn't support nested tags, so if this is nested,
+                ' we need to close the previous one before opening a new one,
+                ' and reopen it after
+                isClosing = replaceTagWith.StartsWith("/")
+                lastValidTag = invalid
+                for i = openTags.count() - 1 to 0 step -1
+                    ' do we have a valid tag still open?
+                    if isValid(openTags[i])
+                        lastValidTag = openTags[i]
+                        exit for
+                    end if
+                end for
+                if isValid(lastValidTag)
+                    if isClosing
+                        styledText += `<${replaceTagWith}><${lastValidTag}>`
+                        currentStyle = drawingStyles[lastValidTag]
+                    else
+                        openTags.push(replaceTagWith)
+                        styledText += `</${lastValidTag}><${replaceTagWith}>`
+                    end if
+                else
+                    if isClosing
+                        currentStyle = drawingStyles["default"]
+                    else
                         openTags.push(replaceTagWith)
                     end if
-                else if tagValue = "i"
-                    ' opening italic tag
-                    tagNumber++
-                    replaceTagWith = `tag${tagNumber}`
-                    newStyle = {
-                        "fontSize": currentStyle.fontSize,
-                        "color": currentStyle.color
-                    }
-                    if currentStyle.fontUri = captionFonts.bold
-                        newStyle.fontUri = captionFonts.bolditalic
-                    else
-                        newStyle.fontUri = captionFonts.italic
-                    end if
-                    drawingStyles.AddReplace(replaceTagWith, newStyle)
-                    currentStyle = newStyle
-                else if tagValue = "b"
-                    ' opening bold tag
-                    tagNumber++
-                    replaceTagWith = `tag${tagNumber}`
-                    newStyle = {
-                        "fontSize": currentStyle.fontSize,
-                        "color": currentStyle.color
-                    }
-                    if currentStyle.fontUri = captionFonts.italic
-                        newStyle.fontUri = captionFonts.bolditalic
-                    else
-                        newStyle.fontUri = captionFonts.bold
-                    end if
-                    drawingStyles.AddReplace(replaceTagWith, newStyle)
-                    currentStyle = newStyle
-                else if tagValue.StartsWith("/")
-                    ' closing tag
-                    if openTags.Count() > 0
-                        openTag = openTags.pop()
-                        if isValid(openTag)
-                            replaceTagWith = `/${openTag}`
-                        end if
-                    end if
+                    styledText += `<${replaceTagWith}>`
                 end if
-                if replaceTagWith.Len() > 0
-                    ' MultiStyleLabel doesn't support nested tags, so if this is nested,
-                    ' we need to close the previous one before opening a new one,
-                    ' and reopen it after
-                    isClosing = replaceTagWith.StartsWith("/")
-                    lastValidTag = invalid
-                    for i = openTags.count() - 1 to 0 step -1
-                        ' do we have a valid tag still open?
-                        if isValid(openTags[i])
-                            lastValidTag = openTags[i]
-                            exit for
-                        end if
-                    end for
-                    if isValid(lastValidTag)
-                        if isClosing
-                            styledText += `<${replaceTagWith}><${lastValidTag}>`
-                            currentStyle = drawingStyles[lastValidTag]
-                        else
-                            openTags.push(replaceTagWith)
-                            styledText += `</${lastValidTag}><${replaceTagWith}>`
-                        end if
-                    else
-                        if isClosing
-                            currentStyle = drawingStyles["default"]
-                        else
-                            openTags.push(replaceTagWith)
-                        end if
-                        styledText += `<${replaceTagWith}>`
-                    end if
-                end if
-                styledText += part.Mid(tagEnd + 1)
-            end for
-
-            label = CreateObject("roSGNode", "MultiStyleLabel")
-            label.drawingStyles = drawingStyles
-            label.text = styledText
-            label.horizAlign = "center"
-
-            lines = newLayoutGroup(label)
-            rect = newRect(lines, entry.LookupCI("id"), styledText, drawingStyles, captionLineHeights)
-            ' Use the post-wrap line count (not the original VTT line count),
-            ' since wrapping may have split a line into more visual lines
-            wrappedLineCount = styledText.split(Chr(10)).count()
-            finalStyles = prepareStyles(entry["styles"], rect, wrappedLineCount)
-            rect.translation = finalStyles.translation
-
-            adjustForCaptionOverlaps(rect, captions)
-
-            ' Create window background
-            windowBg = createWindowBackground(entry.LookupCI("id"), styledText, rect.translation[1], m.windowBgColor, captionLineHeights)
-            if isValid(windowBg)
-                captions.push(windowBg)
             end if
-            captions.push(rect)
+            styledText += part.Mid(tagEnd + 1)
+        end for
+
+        label = CreateObject("roSGNode", "MultiStyleLabel")
+        label.drawingStyles = drawingStyles
+        label.text = styledText
+        label.horizAlign = "center"
+
+        lines = newLayoutGroup(label)
+        rect = newRect(lines, entry.LookupCI("id"), styledText, drawingStyles, captionLineHeights)
+        ' Use the post-wrap line count (not the original VTT line count),
+        ' since wrapping may have split a line into more visual lines
+        wrappedLineCount = styledText.split(Chr(10)).count()
+        finalStyles = prepareStyles(entry["styles"], rect, wrappedLineCount)
+        rect.translation = finalStyles.translation
+
+        adjustForCaptionOverlaps(rect, captions)
+
+        ' Create window background
+        windowBg = createWindowBackground(entry.LookupCI("id"), styledText, rect.translation[1], m.windowBgColor, captionLineHeights)
+        if isValid(windowBg)
+            captions.push(windowBg)
         end if
+        captions.push(rect)
+
     end for
 
     m.top.currentCaption = captions
