@@ -71,3 +71,18 @@ sub onLogoLoadStatusChanged(event)
 
     m.itemTitleLabel.maxWidth = 1400 - logoWidth - LOGO_RIGHT_PADDING
 end sub
+
+sub cleanup()
+    ' Unobserve all fields
+    m.top.unobserveField("itemTitle")
+    m.top.unobserveField("itemSubtitle")
+    m.top.unobserveField("itemSeason")
+    m.top.unobserveField("itemEpisode")
+    m.top.unobserveField("itemEpisodeEnd")
+    m.top.unobserveField("itemLogo")
+
+    if isValid(m.logoPoster)
+        m.logoPoster.unobserveField("loadStatus")
+        m.logoPoster.uri = ""
+    end if
+end sub

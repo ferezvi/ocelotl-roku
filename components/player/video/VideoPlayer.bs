@@ -443,21 +443,47 @@ sub playPreviousQueueItem()
 end sub
 
 sub cleanupBeforeExit()
-    m.loadContentTask.control = "stop"
-    m.loadContentTask.unobserveField("content")
+    ' Clean up OSD first
+    if isValid(m.videoOsd)
+        m.videoOsd.callFunc("cleanupTimers")
+    end if
 
+    ' Clean up Top OSD
+    if isValid(m.osdTop)
+        m.osdTop.callFunc("cleanup")
+    end if
+
+    ' Clean up load content task
+    if isValid(m.loadContentTask)
+        m.loadContentTask.control = TaskControl.STOP
+        m.loadContentTask.unobserveField("content")
+    end if
+
+    ' Clean up trickplay
     if isValid(m.trickplay)
         m.trickplay.callFunc("stopPreload")
     end if
 
+    ' Clean up caption task
     if isValid(m.captionTask)
-        m.captionTask.control = "stop"
+        m.captionTask.control = TaskControl.STOP
+        m.captionTask.unobserveField("currentCaption")
     end if
 
-    m.bufferCheckTimer.control = "stop"
-    m.bufferStuckTimer.control = "stop"
-    m.playbackSanityTimer.control = "stop"
-    m.playbackTimer.control = "stop"
+    ' Stop timers
+    if isValid(m.bufferCheckTimer)
+        m.bufferCheckTimer.control = "stop"
+    end if
 
-    m.videoOsd.callFunc("cleanupTimers")
+    if isValid(m.bufferStuckTimer)
+        m.bufferStuckTimer.control = "stop"
+    end if
+
+    if isValid(m.playbackSanityTimer)
+        m.playbackSanityTimer.control = "stop"
+    end if
+
+    if isValid(m.playbackTimer)
+        m.playbackTimer.control = "stop"
+    end if
 end sub
