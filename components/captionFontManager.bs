@@ -75,61 +75,6 @@ function measureLineHeights(fonts as object, fontSize as integer, textColor as s
     }
 end function
 
-' Splits a UTF-8 string into individual character sequences.
-' Handles ASCII, accented characters, CJK and other multi-byte characters.
-function utf8SplitChars(text as string) as object
-    chars = []
-    i = 0
-    textLen = Len(text)
-
-    while i < textLen
-        byte1 = Asc(Mid(text, i + 1, 1))
-
-        if byte1 >= 240
-            sequenceLength = 4
-        else if byte1 >= 224
-            sequenceLength = 3
-        else if byte1 >= 192
-            sequenceLength = 2
-        else
-            sequenceLength = 1
-        end if
-
-        chars.push(Mid(text, i + 1, sequenceLength))
-        i = i + sequenceLength
-    end while
-
-    return chars
-end function
-
-
-' Converts a UTF-8 character sequence to its Unicode code point.
-function utf8CodePoint(char as string) as integer
-    length = Len(char)
-
-    b1 = Asc(Mid(char, 1, 1))
-
-    if length = 1
-        return b1
-    end if
-
-    b2 = Asc(Mid(char, 2, 1))
-
-    if length = 2
-        return (b1 and &H1F) * 64 + (b2 and &H3F)
-    end if
-
-    b3 = Asc(Mid(char, 3, 1))
-
-    if length = 3
-        return (b1 and &H0F) * 4096 + (b2 and &H3F) * 64 + (b3 and &H3F)
-    end if
-
-    b4 = Asc(Mid(char, 4, 1))
-
-    return (b1 and &H07) * 262144 + (b2 and &H3F) * 4096 + (b3 and &H3F) * 64 + (b4 and &H3F)
-end function
-
 ' Checks if a single character is covered by Ocelotl
 function isCharCovered(codePoint as integer, coverage as object) as boolean
     if not isValid(coverage) or not isValid(coverage["default"]) or coverage["default"].count() = 0
@@ -151,8 +96,13 @@ function textNeedsFallback(text as string, coverage as object) as boolean
         return true
     end if
 
-    for each char in utf8SplitChars(text)
-        codePoint = utf8CodePoint(char)
+    for i = 1 to Len(text)
+        codePoint = Asc(Mid(text, i, 1))
+
+        ' Ignore line breaks, tabs and Unicode variation selectors.
+        if codePoint = 10 or codePoint = 13 or codePoint = 9 or (codePoint >= &HFE00 and codePoint <= &HFE0F)
+            continue for
+        end if
 
         if not isCharCovered(codePoint, coverage)
             return true
@@ -208,5 +158,21 @@ function getFontDataForText(manager as object, text as string) as object
     }
 
     manager.cache[text] = result
+    return result
+end function
+
+function removeVariationSelectors(text as string) as string
+    result = string.EMPTY
+
+    for i = 1 to Len(text)
+        codePoint = Asc(Mid(text, i, 1))
+
+        if codePoint >= &HFE00 and codePoint <= &HFE0F
+            continue for
+        end if
+
+        result += Mid(text, i, 1)
+    end for
+
     return result
 end function

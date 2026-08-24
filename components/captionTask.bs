@@ -167,6 +167,7 @@ sub updateCaption()
         if entry["start"] <= m.top.currentPos and m.top.currentPos < entry["end"]
 
             fullText = entry["text"].Join(Chr(10))
+            fullText = removeVariationSelectors(fullText)
 
             captionPosition = chainLookupReturn(entry["styles"], "position", string.EMPTY)
 
