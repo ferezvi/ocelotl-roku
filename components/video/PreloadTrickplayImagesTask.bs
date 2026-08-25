@@ -18,9 +18,11 @@ sub preloadTrickplayImagesTask()
         ' so scrubbing near the resume point works immediately.
         ' --------------------------------------------------------
         if priorityTile >= 0 and priorityTile <= maxTile
+            if m.top.control = "stop" then return
             downloadTrickplayTile(fs, priorityTile)
 
             if priorityTile + 1 <= maxTile
+                if m.top.control = "stop" then return
                 downloadTrickplayTile(fs, priorityTile + 1)
             end if
         end if
@@ -35,6 +37,7 @@ sub preloadTrickplayImagesTask()
         ' Already-downloaded tiles from pass 1 are skipped via fs.Exists.
         ' --------------------------------------------------------
         for tileIndex = 0 to maxTile
+            if m.top.control = "stop" then return
             downloadTrickplayTile(fs, tileIndex)
 
             if tileIndex = 0

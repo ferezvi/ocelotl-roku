@@ -885,4 +885,5 @@ sub stopPreload()
     if isValid(m.preloadTask)
         m.preloadTask.control = "stop"
     end if
+    resetTrickplayBuffers()
 end sub

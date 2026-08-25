@@ -80,11 +80,13 @@ end sub
 
 sub fetchCaption()
     m.captionTimer.control = "stop"
+    m.fontManager.cache = {}
     re = CreateObject("roRegex", "(http.*?\.vtt)", "s")
     url = re.match(m.top.url)[0]
     if url <> invalid
         m.reader.setUrl(url)
         text = m.reader.GetToString()
+        m.captionList = []
         m.captionList = parseVTT(text)
         m.lastRenderedCaptionKey = string.EMPTY
         m.captionTimer.control = "start"
