@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="Screensaver" extends="Group">
+    <interface>
+        <field id="enabled" type="boolean" value="true" />
+        <field id="idleTimeout" type="integer" value="30" />
+        <field id="isActive" type="boolean" value="false" alwaysNotify="true" />
+
+        <function name="resetTimer" />
+        <function name="hide" />
+        <function name="setLogo" />
+        <function name="setBackdrop" />
+    </interface>
+
+    <children>
+        <Rectangle id="overlay" width="1920" height="1080" color="0x000000CC" visible="false" />
+        <Backdrop id="backdrop" visible="false" />
+        <!-- Con padding de 20px -->
+        <Poster id="logo"
+            width="200"
+            height="100"
+            translation="[1700, 960]"
+            loadDisplayMode="scaleToFit"
+            visible="false"
+            uri="pkg:/images/logo.png" />
+        <Timer id="idleTimer" repeat="true" duration="1" />
+    </children>
+</component>

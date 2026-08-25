@@ -5,6 +5,9 @@ import "pkg:/source/utils/misc.bs"
 sub init()
     m.top.backgroundURI = ""
     m.spinner = m.top.findNode("spinner")
+    m.screensaver = m.top.findNode("screensaver")
+    m.screensaver.callFunc("setLogo", "pkg:/images/logo.png")
+    m.global.addFields({ screensaver: m.screensaver })
 end sub
 
 ' Triggered when the isLoading boolean component field is changed
@@ -44,6 +47,8 @@ end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
+
+    if isValid(m.screensaver) then m.screensaver.callFunc("resetTimer")
 
     if key = "back"
         confirmExit = chainLookupReturn(m.global.session, "user.settings.`global.confirmexit`", false)

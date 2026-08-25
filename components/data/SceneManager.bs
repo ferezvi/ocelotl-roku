@@ -15,6 +15,9 @@ end sub
 sub pushScene(newGroup)
     currentGroup = m.groups.peek()
     if isValid(newGroup)
+        if not newGroup.hasField("lastFocus")
+            newGroup.addField("lastFocus", "node", true)
+        end if
         if isValid(currentGroup)
             'Search through group and store off last focused item
             if currentGroup.focusedChild <> invalid
@@ -598,3 +601,41 @@ end sub
 function isDialogOpen() as boolean
     return isValid(m.scene.dialog)
 end function
+
+sub restoreFocusToActiveScene()
+    activeScene = getActiveScene()
+    if not isValid(activeScene) then return
+
+    if isValid(activeScene.lastFocus)
+        activeScene.lastFocus.setFocus(true)
+        if activeScene.lastFocus.hasFocus()
+            return
+        end if
+    end if
+
+    restoreFocusRecursive(activeScene)
+end sub
+
+sub restoreFocusRecursive(node as object)
+    if not isValid(node) then return
+
+    if node.focusable = true and node.visible = true
+        node.setFocus(true)
+        return
+    end if
+
+    if isValid(node.getChildren)
+        for each child in node.getChildren()
+            if isValid(child) and child.visible = true
+                restoreFocusRecursive(child)
+                if node.getScene().getFocusedChild() <> invalid
+                    return
+                end if
+            end if
+        end for
+    end if
+end sub
+
+sub onScreensaverHidden()
+    restoreFocusToActiveScene()
+end sub

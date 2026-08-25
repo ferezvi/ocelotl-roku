@@ -76,6 +76,7 @@ sub init()
     m.loadContentTask.unobserveField("content")
     m.loadContentTask.observeField("content", "onVideoContentLoaded")
     m.loadContentTask.control = TaskControl.RUN
+    m.screensaver = m.global.screensaver
 
     ' --------------------------------------------------------
     ' Playback reporting.
@@ -296,6 +297,13 @@ sub onStateChanged()
         m.spinnerPercentLabel.visible = false
     end if
 
+    if m.top.state = "playing" or m.top.state = "paused"
+        if isValid(m.screensaver)
+            m.screensaver.callFunc("resetTimer")
+        end if
+    end if
+
+
     onBufferStateChanged()
 
     reportPlaybackStateChanged()
@@ -334,6 +342,10 @@ sub onVideoPositionChanged()
 
         m.skipSegmentsManager.position = m.top.position
         m.skipSegmentsManager.duration = m.top.duration
+    end if
+
+    if isValid(m.screensaver)
+        m.screensaver.callFunc("resetTimer")
     end if
 
     if isValid(m.captionTask)
