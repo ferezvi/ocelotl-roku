@@ -4,5 +4,10 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press then return false
 
+    notifyActivity()
     return false
 end function
+
+sub notifyActivity()
+    m.top.userActivity = not m.top.userActivity
+end sub

@@ -33,6 +33,7 @@ sub pushScene(newGroup)
             end if
 
             if currentGroup.isSubType("JFGroup")
+                currentGroup.unobserveField("userActivity")
                 unregisterOverhangData(currentGroup)
             end if
 
@@ -66,11 +67,11 @@ sub pushScene(newGroup)
         if newGroup.isSubType("JFGroup")
             registerOverhangData(newGroup)
 
-            ' Some groups set focus to a specific component within init(), so we don't want to
-            ' change if that is the case.
             if newGroup.isInFocusChain() = false
                 newGroup.setFocus(true)
             end if
+
+            newGroup.observeField("userActivity", "onGroupActivity")
         end if
     else
         currentGroup.focusedChild.setFocus(true)
@@ -85,6 +86,7 @@ sub popScene()
     if isValid(group)
         if group.isSubType("JFGroup")
             unregisterOverhangData(group)
+            group.unobserveField("userActivity")
         end if
 
         group.visible = false
@@ -126,11 +128,18 @@ sub popScene()
                 end if
             end if
         end if
+        if group.isSubType("JFGroup")
+            group.observeField("userActivity", "onGroupActivity")
+        end if
     else
         ' Exit app if the stack is empty after removing group
         m.scene.exit = true
     end if
     stopLoadingSpinner()
+end sub
+
+sub onGroupActivity()
+    if isValid(m.global.screensaver) then m.global.screensaver.callFunc("resetTimer")
 end sub
 
 '

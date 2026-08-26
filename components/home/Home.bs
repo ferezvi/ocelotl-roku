@@ -123,6 +123,7 @@ sub postFinished()
 end sub
 
 sub onRowFocusedChange()
+    notifyActivity()
     if m.top.rowFocused > 0
         if m.buttons.opacity > 0
             toggleButtonsVisibility()
@@ -145,6 +146,7 @@ sub toggleButtonsVisibility(runInReverse = false as boolean)
 end sub
 
 sub onHomeItemFocusedChange()
+    notifyActivity()
     if not isValid(m.homeRows.rowItemFocused) then return
 
     row = m.homeRows.rowItemFocused[0]

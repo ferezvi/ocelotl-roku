@@ -6,5 +6,6 @@
     <field id="overhangTitle" type="string" />
     <field id="optionsAvailable" value="true" type="boolean" />
     <field id="overhangVisible" value="true" type="boolean" />
+    <field id="userActivity" type="boolean" alwaysNotify="true" />
   </interface>
 </component>
