@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="SkipSegmentsManager" extends="Group" focusable="true">
+    <interface>
+        <!-- Inputs desde VideoPlayer -->
+        <field id="mediaSegments" type="assocarray" />
+        <field id="chapters" type="array" />
+        <field id="duration" type="float" />
+        <field id="position" type="float" />
+        <field id="playbackState" type="string" />
+        <field id="isSeeking" type="boolean" />
+        <field id="userSettings" type="assocarray" />
+        <field id="osdOpen" type="boolean" value="false" onChange="onOsdOpenChanged" />
+        <!-- Outputs -->
+        <field id="hasActiveSegment" type="boolean" value="false" />
+        <field id="activeSegmentType" type="string" />
+        <field id="action" type="assocarray" alwaysNotify="true" />
+        <function name="skipCurrentSegment" />
+        <function name="focusSkipButton" />
+        <function name="clearFocus" />
+        <function name="previousChapter" />
+        <function name="nextChapter" />
+    </interface>
+    <children>
+        <!-- Botón de skip, inicialmente oculto -->
+        <StandardButton id="skipButton" visible="false" height="85" width="275" translation="[1500, 950]" text="" />
+    </children>
+</component>

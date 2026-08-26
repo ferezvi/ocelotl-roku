@@ -17,4 +17,7 @@ enum ColorPalette
     TRIADGREEN = "#67ff68"
     VIEWBACKGROUND = "#000018"
     WHITE = "#ffffff"
+
+    TEXT_PRIMARY = "#ffffff"
+    PRIMARY_LIGHT = "#ffffee"
 end enum

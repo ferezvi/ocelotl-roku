@@ -1,0 +1,501 @@
+import "pkg:/components/player/tracks/AudioTrackHandler.bs"
+import "pkg:/components/player/tracks/SubtitleHandler.bs"
+import "pkg:/components/player/video/BufferHandler.bs"
+import "pkg:/components/player/video/PlaybackReporter.bs"
+import "pkg:/components/player/video/VideoInputHandler.bs"
+import "pkg:/source/enums/MediaPlaybackState.bs"
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/enums/VideoControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+' ============================================================
+' LIFECYCLE
+' ============================================================
+
+sub init()
+    m.top.enableUI = false
+
+    ' Player UI.
+    m.videoOsd = m.top.findNode("playerOSD")
+    m.playerSpinner = m.top.findNode("playerSpinner")
+    m.spinnerPercentLabel = m.top.findNode("spinnerPercentLabel")
+
+    m.trickplay = m.top.findNode("trickplay")
+    m.trickplay.observeField("resumeTilesReady", "onTrickplayResumeTilesReady")
+    m.videoOsd.observeField("previewPosition", "onTrickplayPreviewPositionChanged")
+    m.videoOsd.observeField("isSeeking", "onTrickplaySeekingChanged")
+
+    ' Timeout de seguridad para el trickplay priority preload -
+    ' creado una sola vez, reutilizado en cada carga (ver onVideoContentLoaded).
+    m.trickplayStartTimeoutTimer = CreateObject("roSGNode", "Timer")
+    m.trickplayStartTimeoutTimer.duration = 5
+    m.trickplayStartTimeoutTimer.repeat = false
+    m.trickplayStartTimeoutTimer.observeField("fire", "onTrickplayStartTimeout")
+    m.top.appendChild(m.trickplayStartTimeoutTimer)
+
+    m.skipSegmentsManager = m.top.findNode("skipSegmentsManager")
+    m.skipSegmentsManager.observeField("action", "onSkipSegmentsAction")
+    m.skipSegmentsManager.observeField("hasActiveSegment", "onSkipSegmentsActiveSegmentChanged")
+    m.skipSegmentsManager.userSettings = m.global.session.user.settings
+    m.videoOsd.skipSegmentsManager = m.skipSegmentsManager
+
+    ' Player OSD events.
+    m.videoOsd.observeField("trackSelected", "onTrackSelected")
+    m.videoOsd.observeField("action", "onOSDAction")
+    m.videoOsd.observeField("visible", "onOSDVisibilityChanged")
+
+    ' Video events.
+    m.top.observeField("state", "onStateChanged")
+    m.top.observeField("position", "onVideoPositionChanged")
+    m.top.observeField("duration", "onVideoPositionChanged")
+    m.top.observeField("bufferingStatus", "onBufferingStatusChanged")
+
+    stopLoadingSpinner()
+
+    ' Current queue item.
+    currentItem = m.global.queueManager.callFunc("getCurrentItem")
+    m.top.id = currentItem.id
+
+    ' Preferred subtitle.
+    preferredSubtitle = m.global.queueManager.callFunc("getPreferredSubtitleTrack")
+
+    m.top.SelectedSubtitle = isChainValid(preferredSubtitle, "StreamIndex") ? preferredSubtitle.StreamIndex : SubtitleSelection.NOTSET
+
+    m.firstContentLoad = true
+
+    ' --------------------------------------------------------
+    ' Load video metadata/content.
+    ' --------------------------------------------------------
+
+    m.loadContentTask = CreateObject("roSGNode", "LoadVideoContentTask")
+    m.loadContentTask.selectedSubtitleIndex = m.top.SelectedSubtitle
+    m.loadContentTask.itemId = currentItem.id
+    m.loadContentTask.itemType = currentItem.type
+    m.loadContentTask.selectedAudioStreamIndex = currentItem.selectedAudioStreamIndex
+    m.loadContentTask.unobserveField("content")
+    m.loadContentTask.observeField("content", "onVideoContentLoaded")
+    m.loadContentTask.control = TaskControl.RUN
+    m.screensaver = m.global.screensaver
+
+    ' --------------------------------------------------------
+    ' Playback reporting.
+    ' --------------------------------------------------------
+
+    initPlaybackReporter()
+    initAudioTrackHandler()
+    initSubtitleHandler()
+    initBufferHandler()
+    centerSpinnerPercentLabel()
+
+    m.top.setFocus(true)
+end sub
+
+sub onTrickplayPreviewPositionChanged()
+    m.trickplay.previewPosition = m.videoOsd.previewPosition
+end sub
+
+sub onTrickplaySeekingChanged()
+    m.trickplay.isSeeking = m.videoOsd.isSeeking
+    m.skipSegmentsManager.isSeeking = m.videoOsd.isSeeking
+
+    if m.videoOsd.isSeeking
+        m.trickplay.visible = true
+        m.trickplay.previewPosition = m.videoOsd.previewPosition
+    else
+        ' Trickplay.bs only hides its internal images/box background when
+        ' seeking ends - the container node's own visible flag was never
+        ' reset here, so it stayed "visible" (empty) indefinitely after the
+        ' first seek of the session.
+        m.trickplay.visible = false
+    end if
+end sub
+
+' ============================================================
+' VIDEO CONTENT
+' ============================================================
+
+sub onVideoContentLoaded()
+    stopLoadingSpinner()
+
+    m.loadContentTask.unobserveField("content")
+    m.loadContentTask.control = TaskControl.STOP
+
+    videoContent = m.loadContentTask.content
+    m.loadContentTask.content = []
+
+    if not isValid(videoContent) or not isValid(videoContent[0])
+        m.top.backPressed = true
+        return
+    end if
+
+    item = videoContent[0]
+
+    m.skipSegmentsManager.mediaSegments = item.mediaSegments
+    m.skipSegmentsManager.chapters = item.chapters
+    m.videoOsd.progressBar.mediaSegments = item.mediaSegments
+
+    ' --------------------------------------------------------
+    ' Trickplay
+    ' --------------------------------------------------------
+    ' Trickplay owns its own tile preload lifecycle (Task creation, the
+    ' two-pass resume strategy, cache cleanup for the previous video).
+    ' VideoPlayer only feeds inputs and waits on resumeTilesReady below.
+
+    resumePosition = 0
+
+    if isValid(item.content) and isValid(item.content.PlayStart)
+        resumePosition = item.content.PlayStart
+    end if
+
+    m.waitingForPriorityTrickplay = (resumePosition > 0)
+
+    m.trickplay.videoId = item.id
+    m.trickplay.resumePosition = resumePosition
+    m.trickplay.trickplay = item.trickplay
+
+    ' --------------------------------------------------------
+    ' Video playback fields.
+    ' --------------------------------------------------------
+
+    m.top.PlaySessionId = item.PlaySessionId
+    m.top.videoId = item.id
+    m.playbackSanityChecked = false
+    m.reloadingForTranscode = false
+    m.runtimeticks = item.runtimeticks
+    m.top.container = item.container
+    m.top.mediaSourceId = item.mediaSourceId
+    m.top.fullSubtitleData = item.fullSubtitleData
+    m.top.fullAudioData = item.fullAudioData
+    m.top.audioIndex = item.audioIndex
+    m.top.transcodeParams = item.transcodeparams
+    m.top.isTranscoded = item.isTranscoded
+    m.top.videoWidth = item.videoWidth
+    m.top.videoHeight = item.videoHeight
+
+    m.videoOsd.videoId = item.id
+    m.top.content = item.content
+
+    ' Falls back to track 0 if audioIndex is invalid.
+    if isValid(item.audioIndex)
+        m.top.audioTrack = item.audioIndex.toStr()
+    else
+        m.top.audioTrack = "0"
+    end if
+
+    m.top.allowCaptions = not (isValid(item.subtitlesBurnedIn) and item.subtitlesBurnedIn)
+
+    ' --------------------------------------------------------
+    ' Subtitle/audio information.
+    ' --------------------------------------------------------
+
+    applySubtitleContent(item)
+
+    m.videoOsd.fullAudioData = item.fullAudioData
+    m.videoOsd.fullSubtitleData = item.fullSubtitleData
+    m.videoOsd.audioIndex = item.audioIndex
+    m.videoOsd.selectedSubtitleIndex = item.SelectedSubtitle
+    m.videoOsd.itemId = item.id
+    m.videoOsd.overview = item.overview
+
+    ' --------------------------------------------------------
+    ' OSD metadata.
+    ' --------------------------------------------------------
+
+    if item.content.live
+        ' Live content uses the same player flow.
+    end if
+
+    m.videoOsd.itemTitle = item.content.title
+
+    if isValid(item.seasonNumber)
+        m.videoOsd.itemSeason = item.seasonNumber.ToStr()
+    end if
+
+    if isValid(item.episodeNumber)
+        m.videoOsd.itemEpisode = item.episodeNumber.ToStr()
+    end if
+
+    if isValid(item.episodeNumberEnd)
+        m.videoOsd.itemEpisodeEnd = item.episodeNumberEnd.ToStr()
+    end if
+
+    m.videoOsd.itemLogo = isValidAndNotEmpty(item.logoImage) ? item.logoImage : ""
+
+    ' --------------------------------------------------------
+    ' Initial audio selection.
+    ' --------------------------------------------------------
+
+    if m.firstContentLoad
+        m.top.selectedAudioIndex = item.audioIndex
+        m.firstContentLoad = false
+    end if
+
+    ' Start playback.
+    if m.waitingForPriorityTrickplay
+        m.playerSpinner.visible = true
+
+        if isValid(m.trickplayStartTimeoutTimer)
+            m.trickplayStartTimeoutTimer.control = "stop"
+            m.trickplayStartTimeoutTimer.control = "start"
+        end if
+    else
+        m.top.control = VideoControl.PLAY
+        m.top.setFocus(true)
+    end if
+end sub
+
+sub onTrickplayResumeTilesReady()
+    if not m.trickplay.resumeTilesReady
+        return
+    end if
+
+    beginDeferredPlayback()
+end sub
+
+sub onTrickplayStartTimeout()
+    beginDeferredPlayback()
+end sub
+
+sub beginDeferredPlayback()
+    if not m.waitingForPriorityTrickplay
+        return
+    end if
+
+    m.waitingForPriorityTrickplay = false
+    m.trickplayStartTimeoutTimer.control = "stop"
+
+    ' Leave the spinner visible through the handoff to VideoControl.PLAY —
+    ' onStateChanged will take over once BUFFERING fires. Turning it off
+    ' here creates a black-frame flash before that event arrives.
+    m.top.control = VideoControl.PLAY
+    m.top.setFocus(true)
+end sub
+
+' ============================================================
+' PLAYBACK STATE
+' ============================================================
+
+sub onStateChanged()
+    m.videoOsd.playbackState = m.top.state
+    m.skipSegmentsManager.playbackState = m.top.state
+
+    ' Keep custom captions synchronized with playback.
+    if isValid(m.captionTask)
+        m.captionTask.playerState = m.top.state + m.top.globalCaptionMode
+    end if
+
+    ' --------------------------------------------------------
+    ' Buffering spinner.
+    ' --------------------------------------------------------
+
+    if m.top.state = MediaPlaybackState.BUFFERING
+        m.playerSpinner.visible = true
+        m.spinnerPercentLabel.visible = true
+    else
+        m.playerSpinner.visible = false
+        m.spinnerPercentLabel.visible = false
+    end if
+
+    if m.top.state = "playing" or m.top.state = "paused"
+        if isValid(m.screensaver)
+            m.screensaver.callFunc("resetTimer")
+        end if
+    end if
+
+
+    onBufferStateChanged()
+
+    reportPlaybackStateChanged()
+end sub
+
+' ============================================================
+' BUFFERING
+' ============================================================
+
+sub onBufferingStatusChanged()
+    if m.top.state <> MediaPlaybackState.BUFFERING
+        return
+    end if
+
+    if isValid(m.top.bufferingStatus)
+        percentage = m.top.bufferingStatus["percentage"]
+
+        if isValid(percentage)
+            m.spinnerPercentLabel.text = percentage.ToStr() + "%"
+            centerSpinnerPercentLabel()
+            m.spinnerPercentLabel.visible = true
+        end if
+    end if
+end sub
+
+' ============================================================
+' VIDEO POSITION
+' ============================================================
+
+sub onVideoPositionChanged()
+    if m.top.position <> invalid and m.top.duration <> invalid
+        m.videoOsd.position = m.top.position
+        m.videoOsd.duration = m.top.duration
+
+        m.trickplay.duration = m.top.duration
+
+        m.skipSegmentsManager.position = m.top.position
+        m.skipSegmentsManager.duration = m.top.duration
+    end if
+
+    if isValid(m.screensaver)
+        m.screensaver.callFunc("resetTimer")
+    end if
+
+    if isValid(m.captionTask)
+        m.captionTask.currentPos = Int(m.top.position * 1000)
+    end if
+end sub
+
+' ============================================================
+' AUDIO TRACK SELECTION
+' ============================================================
+
+sub onTrackSelected()
+    selection = m.videoOsd.trackSelected
+
+    if not isValid(selection)
+        return
+    end if
+
+    if selection.kind = "audio"
+        switchAudioTrack(selection.index, selection.jellyfinIndex)
+
+    else if selection.kind = "subtitle"
+        m.top.previousSubtitleWasEncoded = applySubtitleTrackFields(selection.index, m.top.fullSubtitleData)
+        m.top.SelectedSubtitle = selection.index
+        m.loadContentTask.selectedSubtitleIndex = selection.index
+    end if
+end sub
+
+' ============================================================
+' OSD
+' ============================================================
+
+sub onOSDVisibilityChanged()
+    if not m.videoOsd.visible
+        m.trickplay.visible = false
+        m.top.setFocus(true)
+    end if
+end sub
+
+' ============================================================
+' HELPERS
+' ============================================================
+
+sub centerSpinnerPercentLabel()
+    spinnerWidth = m.playerSpinner.poster.bitmapWidth
+    spinnerHeight = m.playerSpinner.poster.bitmapHeight
+
+    m.spinnerPercentLabel.translation = [
+        m.playerSpinner.translation[0] + spinnerWidth / 2 - m.spinnerPercentLabel.width / 2,
+        m.playerSpinner.translation[1] + spinnerHeight / 2 - m.spinnerPercentLabel.height / 2
+    ]
+end sub
+
+function max(a as float, b as float) as float
+    if a > b
+        return a
+    end if
+
+    return b
+end function
+
+sub onSkipSegmentsActiveSegmentChanged()
+    m.top.hasActiveSegment = m.skipSegmentsManager.hasActiveSegment
+end sub
+
+sub onSkipSegmentsAction()
+    action = m.skipSegmentsManager.action
+
+    if not isValid(action) then return
+
+    if action.type = "seek"
+        m.top.seek = action.position
+    else if action.type = "nextItem"
+        playNextQueueItem()
+    else if action.type = "previousItem"
+        playPreviousQueueItem()
+    end if
+end sub
+
+sub playNextQueueItem()
+    if m.global.queueManager.callFunc("getPosition") >=
+        m.global.queueManager.callFunc("getCount") - 1
+        return
+    end if
+
+    m.top.control = VideoControl.STOP
+    cleanupBeforeExit()
+    m.global.sceneManager.callFunc("clearPreviousScene")
+    m.global.queueManager.callFunc("moveForward")
+    m.global.queueManager.callFunc("playQueue")
+end sub
+
+sub playPreviousQueueItem()
+    currentPosition = m.global.queueManager.callFunc("getPosition")
+
+    if currentPosition <= 0
+        return
+    end if
+
+    m.top.control = VideoControl.STOP
+    cleanupBeforeExit()
+    m.global.sceneManager.callFunc("clearPreviousScene")
+
+    m.global.queueManager.callFunc("moveBack")
+
+    m.global.queueManager.callFunc("playQueue")
+end sub
+
+sub cleanupBeforeExit()
+    ' Clean up OSD first
+    if isValid(m.videoOsd)
+        m.videoOsd.callFunc("cleanupTimers")
+    end if
+
+    ' Clean up Top OSD
+    if isValid(m.osdTop)
+        m.osdTop.callFunc("cleanup")
+    end if
+
+    ' Clean up load content task
+    if isValid(m.loadContentTask)
+        m.loadContentTask.control = TaskControl.STOP
+        m.loadContentTask.unobserveField("content")
+    end if
+
+    ' Clean up trickplay
+    if isValid(m.trickplay)
+        m.trickplay.callFunc("stopPreload")
+    end if
+
+    ' Clean up caption task
+    if isValid(m.captionTask)
+        m.captionTask.control = TaskControl.STOP
+        m.captionTask.unobserveField("currentCaption")
+    end if
+
+    ' Stop timers
+    if isValid(m.bufferCheckTimer)
+        m.bufferCheckTimer.control = "stop"
+    end if
+
+    if isValid(m.bufferStuckTimer)
+        m.bufferStuckTimer.control = "stop"
+    end if
+
+    if isValid(m.playbackSanityTimer)
+        m.playbackSanityTimer.control = "stop"
+    end if
+
+    if isValid(m.playbackTimer)
+        m.playbackTimer.control = "stop"
+    end if
+end sub

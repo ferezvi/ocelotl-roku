@@ -1,0 +1,535 @@
+import "pkg:/source/enums/KeyCode.bs"
+import "pkg:/source/enums/SubtitleSelection.bs"
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+const OSD_INACTIVITY_TIMEOUT_SECONDS = 10
+
+' ------------------------------------------------------------
+' Lifecycle
+' ------------------------------------------------------------
+
+sub init()
+    m.videoControls = m.top.findNode("videoControls")
+    m.progressBar = m.top.findNode("progressBar")
+    m.top.progressBar = m.progressBar ' expose node so VideoPlayer can wire it to SkipSegmentsManager
+    m.optionControls = m.top.findNode("optionControls")
+    m.languagePanel = m.top.findNode("languagePanel")
+    m.mediaInfoPanel = m.top.findNode("mediaInfoPanel")
+    m.synopsisPanel = m.top.findNode("synopsisPanel")
+    m.osdTop = m.top.findNode("topOSD")
+    m.videoControls.observeField("action", "onVideoControlsAction")
+    m.optionControls.observeField("action", "onOptionControlsAction")
+    m.optionControls.observeField("navigationChanged", "onOptionControlsNavigationChanged")
+
+    m.progressBar.observeField("seek", "onProgressBarSeek")
+    m.progressBar.observeField("isSeeking", "onProgressBarSeekingChanged")
+    m.progressBar.observeField("previewPosition", "onProgressBarPreviewPositionChanged")
+
+    m.top.observeField("visible", "onVisibleChanged")
+    m.top.observeField("playbackState", "onIsPlayingChanged")
+    m.top.observeField("overview", "onOverviewChanged")
+    m.top.observeField("position", "onPositionChanged")
+    m.top.observeField("duration", "onDurationChanged")
+    m.top.observeField("itemTitle", "onItemTitleChanged")
+    m.top.observeField("itemSeason", "onItemSeasonChanged")
+    m.top.observeField("itemEpisode", "onItemEpisodeChanged")
+    m.top.observeField("itemEpisodeEnd", "onItemEpisodeEndChanged")
+    m.top.observeField("itemLogo", "onItemLogoChanged")
+
+    m.videoControls.observeField("keyPressed", "onKeyPressed")
+    m.progressBar.observeField("keyPressed", "onKeyPressed")
+    m.optionControls.observeField("keyPressed", "onKeyPressed")
+    m.languagePanel.observeField("keyPressed", "onKeyPressed")
+    m.mediaInfoPanel.observeField("keyPressed", "onKeyPressed")
+    m.progressBar.observeField("seekActivity", "onSeekActivity")
+
+    m.languagePanel.observeField("visible", "onLanguagePanelVisibleChanged")
+    m.languagePanel.observeField("selectionMade", "onLanguagePanelSelection")
+
+    m.mediaInfoTask = createObject("roSGNode", "GetPlaybackInfoTask")
+    m.mediaInfoTask.observeField("data", "onPlaybackInfoLoaded")
+    m.top.appendChild(m.mediaInfoTask)
+
+    m.inactivityTimer = CreateObject("roSGNode", "Timer")
+    m.inactivityTimer.duration = OSD_INACTIVITY_TIMEOUT_SECONDS
+    m.inactivityTimer.observeField("fire", "onInactivityTimerFire")
+    m.top.appendChild(m.inactivityTimer)
+end sub
+
+sub onSkipSegmentsManagerChanged()
+    m.skipSegmentsManager = m.top.skipSegmentsManager
+end sub
+
+' ------------------------------------------------------------
+' Inactivity timer / OSD visibility
+' ------------------------------------------------------------
+
+' Restarts the OSD when it becomes visible (regardless of what triggered
+' the show) and stops it once the OSD is hidden, so it doesn't fire a
+' stray "hide" action while already hidden.
+sub onVisibleChanged()
+    if isValid(m.skipSegmentsManager)
+        m.skipSegmentsManager.osdOpen = m.top.visible
+    end if
+
+    if m.top.visible
+        resetInactivityTimer()
+    else
+        m.inactivityTimer.control = "stop"
+
+        ' A seek nudge (arrow key) sets isSeeking = true in ProgressBar, and
+        ' it's only ever cleared by an explicit OK (commit) or BACK (cancel)
+        ' while the bar has focus. Auto-hide (or any other path that closes
+        ' the OSD) never calls either, so isSeeking stays stuck true - which
+        ' means the next nudge's "false -> true" transition never happens,
+        ' and nothing downstream (trickplay visibility included) re-fires.
+        if m.progressBar.isSeeking
+            m.progressBar.callFunc("cancelSeek")
+        end if
+    end if
+end sub
+
+sub onOptionControlsNavigationChanged()
+    closeOptionPanels()
+end sub
+
+sub closeOptionPanels()
+    m.languagePanel.visible = false
+    m.mediaInfoPanel.visible = false
+    m.synopsisPanel.visible = false
+end sub
+
+sub resetInactivityTimer()
+    m.inactivityTimer.control = "stop"
+    m.inactivityTimer.control = "start"
+end sub
+
+sub onInactivityTimerFire()
+    if m.languagePanel.visible
+        m.languagePanel.visible = false
+    end if
+
+    if m.mediaInfoPanel.visible
+        m.mediaInfoPanel.visible = false
+    end if
+
+    if m.synopsisPanel.visible
+        m.synopsisPanel.visible = false
+    end if
+
+    if m.top.visible
+        m.top.action = "hide"
+    end if
+end sub
+
+sub onKeyPressed()
+    resetInactivityTimer()
+end sub
+
+sub onSeekActivity()
+    if m.progressBar.isSeeking
+        m.inactivityTimer.control = "stop" '
+    else
+        resetInactivityTimer()
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Controls / progress bar
+' ------------------------------------------------------------
+
+sub onVideoControlsAction(event as object)
+    m.top.action = event.getData()
+end sub
+
+sub onProgressBarSeek()
+    m.top.seekPosition = m.progressBar.seek
+    m.top.action = "seek"
+end sub
+
+sub onProgressBarSeekingChanged()
+    m.top.isSeeking = m.progressBar.isSeeking
+
+    m.top.action = m.progressBar.isSeeking ? "seekStart" : "seekEnd"
+
+    if m.progressBar.isSeeking
+        m.inactivityTimer.control = "stop"
+    else
+        resetInactivityTimer()
+    end if
+end sub
+
+sub onProgressBarPreviewPositionChanged()
+    m.top.previewPosition = m.progressBar.previewPosition
+end sub
+
+sub onIsPlayingChanged()
+    m.videoControls.playbackState = m.top.playbackState
+end sub
+
+' ------------------------------------------------------------
+' Progress bar position/duration (fed from VideoPlayer, forwarded down)
+' ------------------------------------------------------------
+
+sub onPositionChanged()
+    m.progressBar.position = m.top.position
+end sub
+
+sub onDurationChanged()
+    m.progressBar.duration = m.top.duration
+end sub
+
+' Forwards seekStep to the progress bar's own preview-shift logic (used
+' for LEFT/RIGHT key nudges while the OSD is opening).
+sub seekStep(direction as integer)
+    m.progressBar.callFunc("seekStep", direction)
+end sub
+
+' ------------------------------------------------------------
+' Top OSD metadata
+' ------------------------------------------------------------
+
+sub onItemTitleChanged()
+    m.osdTop.itemTitle = m.top.itemTitle
+end sub
+
+sub onItemSeasonChanged()
+    m.osdTop.itemSeason = m.top.itemSeason
+end sub
+
+sub onItemEpisodeChanged()
+    m.osdTop.itemEpisode = m.top.itemEpisode
+end sub
+
+sub onItemEpisodeEndChanged()
+    m.osdTop.itemEpisodeEnd = m.top.itemEpisodeEnd
+end sub
+
+sub onItemLogoChanged()
+    m.osdTop.itemLogo = m.top.itemLogo
+end sub
+
+' ------------------------------------------------------------
+' Option controls dispatch
+' ------------------------------------------------------------
+
+sub onOptionControlsAction(event as object)
+    action = event.getData()
+
+    if action = "languageButton"
+        openLanguagePanel()
+    else if action = "mediaInfoButton"
+        toggleMediaInfoPanel()
+    else if action = "infoButton"
+        toggleSynopsisPanel()
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Synopsis
+' ------------------------------------------------------------
+sub onOverviewChanged()
+    m.synopsisPanel.overview = m.top.overview
+end sub
+
+sub toggleSynopsisPanel()
+    m.synopsisPanel.visible = not m.synopsisPanel.visible
+
+    resetInactivityTimer()
+end sub
+
+' ------------------------------------------------------------
+' Language panel (audio / subtitle selection)
+' ------------------------------------------------------------
+
+sub openLanguagePanel()
+    playerView = m.top.getParent()
+    selectedAudioIndex = isValid(playerView) ? playerView.selectedAudioIndex : m.top.audioIndex
+    selectedSubtitleIndex = isValid(playerView) ? playerView.SelectedSubtitle : m.top.selectedSubtitleIndex
+
+    m.languagePanel.audioContent = buildAudioContent(m.top.fullAudioData, selectedAudioIndex)
+    m.languagePanel.subtitleContent = buildSubtitleContent(m.top.fullSubtitleData, selectedSubtitleIndex)
+    m.languagePanel.visible = true
+    resetInactivityTimer()
+end sub
+
+' Adapter: raw Jellyfin audio streams -> LanguagePanel item shape.
+' trackName carries the RokuTrackName so the caller can resolve it against
+' the Video node's native Track index before switching (see
+' onLanguagePanelSelection).
+function buildAudioContent(streams as object, selectedIndex as integer) as object
+    result = []
+    if not isValidAndNotEmpty(streams) then return result
+
+    for each stream in streams
+        label = isValidAndNotEmpty(stream.Title) ? stream.Title : stream.DisplayTitle
+        if not isValidAndNotEmpty(label) then label = stream.Language
+
+        result.push({
+            kind: "audio",
+            index: stream.Index,
+            selected: (stream.Index = selectedIndex),
+            track: { description: label },
+            trackName: stream.RokuTrackName
+        })
+    end for
+
+    return result
+end function
+
+' Adapter: raw Jellyfin subtitle streams -> same shape, plus a synthetic
+' "Off" entry at the top since the server never sends one
+function buildSubtitleContent(subtitles as object, selectedIndex as integer) as object
+    result = [{
+        kind: "subtitle",
+        index: SubtitleSelection.NONE,
+        selected: (selectedIndex = SubtitleSelection.NONE),
+        track: { description: tr("Off") }
+    }]
+
+    if isValidAndNotEmpty(subtitles)
+        for each subtitle in subtitles
+            result.push({
+                kind: "subtitle",
+                index: subtitle.Index,
+                selected: (subtitle.Index = selectedIndex),
+                track: { description: subtitle.Track.Description }
+            })
+        end for
+    end if
+
+    return result
+end function
+
+' onLanguagePanelSelection: forwards the LanguagePanel selection to PlayerView.
+'
+' selection.index comes in Jellyfin's scale (buildAudioContent uses
+' stream.Index). PlayerView.audioIndex lives in Roku's native scale (the
+' "Track" from availableAudioTracks). switchAudioTrack compares desiredIndex
+' against m.top.audioIndex directly, so it must be converted before emitting -
+' otherwise the comparison can accidentally match between the two different
+' scales and silently fail to switch audio.
+sub onLanguagePanelSelection()
+    selection = m.languagePanel.selectionMade
+    if not isValid(selection) then return
+
+    if isStringEqual(selection.kind, "audio")
+        m.global.queueManager.callFunc("setPreferredAudioTrackName", selection.trackName)
+
+        playerView = m.top.getParent()
+        jellyfinIndex = selection.index
+        resolvedIndex = selection.index ' fallback si no hay match
+
+        if isValid(playerView) and isValid(playerView.availableAudioTracks)
+            for each audioTrack in playerView.availableAudioTracks
+                if isStringEqual(audioTrack.LookupCI("name"), selection.trackName)
+                    resolvedIndex = audioTrack.LookupCI("Track").toint()
+                    exit for
+                end if
+            end for
+        end if
+
+        selection.index = resolvedIndex
+        selection.jellyfinIndex = jellyfinIndex
+    end if
+
+    m.top.trackSelected = selection
+end sub
+
+sub onLanguagePanelVisibleChanged()
+    if not m.languagePanel.visible
+        m.optionControls.callFunc("focusControls")
+    end if
+end sub
+
+' ------------------------------------------------------------
+' Media info panel
+' ------------------------------------------------------------
+
+sub toggleMediaInfoPanel()
+    if m.mediaInfoPanel.visible
+        m.mediaInfoPanel.visible = false
+        m.mediaInfoTask.control = "STOP" ' cancela un fetch en curso si lo hay, sin destruir el nodo
+        return
+    end if
+
+    m.mediaInfoPanel.lines = [{ text: tr("Loading..."), isHeader: false }]
+    m.mediaInfoPanel.visible = true
+    resetInactivityTimer()
+
+    m.mediaInfoTask.videoID = m.top.itemId
+    m.mediaInfoTask.control = "RUN"
+end sub
+
+sub onPlaybackInfoLoaded()
+    data = m.mediaInfoTask.data
+    if not isValid(data) or not isValid(data.playbackInfo) then return
+
+    m.mediaInfoPanel.lines = parsePlaybackInfoLines(data.playbackInfo.data)
+end sub
+
+' Adapter: strips the <header>/<b> markup GetPlaybackInfoTask builds for the
+' legacy standardDialog, since our Label-based MediaInfoPanel can't render HTML
+function parsePlaybackInfoLines(rawLines as object) as object
+    lines = []
+
+    if not isValidAndNotEmpty(rawLines) then return lines
+
+    for each raw in rawLines
+        text = raw
+        isHeader = Instr(1, text, "<header>") > 0
+
+        text = text.Replace("<header>", "")
+        text = text.Replace("</header>", "")
+        text = text.Replace("<b>", "")
+        text = text.Replace("</b>", "")
+
+        lines.push({ text: text, isHeader: isHeader })
+    end for
+
+    return lines
+end function
+
+' ------------------------------------------------------------
+' Focus helpers
+' ------------------------------------------------------------
+
+sub focusControls()
+    m.optionControls.callFunc("clearFocus")
+    m.progressBar.focused = false
+    m.videoControls.callFunc("focusControls")
+end sub
+
+sub focusProgressBar()
+    m.videoControls.callFunc("clearFocus")
+    m.optionControls.callFunc("clearFocus")
+    m.progressBar.focused = true
+    m.progressBar.setFocus(true)
+end sub
+
+sub focusOptionControls()
+    m.videoControls.callFunc("clearFocus")
+    m.progressBar.focused = false
+    m.optionControls.callFunc("focusControls")
+end sub
+
+' ------------------------------------------------------------
+' Key handling
+' ------------------------------------------------------------
+
+' UP/DOWN switches focus between progress bar and controls, BACK closes the OSD
+' (unless the progress bar is mid-seek, in which case it cancels the seek first)
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press then return false
+
+    if isStringEqual(key, KeyCode.BACK)
+        if m.progressBar.hasFocus() and m.progressBar.isSeeking
+            return false
+        end if
+
+        m.synopsisPanel.visible = false
+        m.mediaInfoPanel.visible = false
+        m.languagePanel.visible = false
+        m.top.action = "hide"
+        return true
+    end if
+
+    if isStringEqual(key, KeyCode.UP)
+        if m.videoControls.isInFocusChain()
+            m.videoControls.callFunc("clearFocus")
+            m.progressBar.focused = true
+            m.progressBar.setFocus(true)
+            return true
+
+        else if m.progressBar.hasFocus()
+            m.progressBar.focused = false
+            m.progressBar.setFocus(false)
+            m.optionControls.callFunc("focusControls")
+            return true
+        end if
+
+    else if isStringEqual(key, KeyCode.DOWN)
+        if m.optionControls.isInFocusChain()
+            m.optionControls.callFunc("clearFocus")
+            m.progressBar.focused = true
+            m.progressBar.setFocus(true)
+            return true
+
+        else if m.progressBar.hasFocus()
+            m.progressBar.focused = false
+            m.progressBar.setFocus(false)
+            m.videoControls.callFunc("focusControls")
+            return true
+        end if
+
+    else if isStringEqual(key, KeyCode.RIGHT) and m.videoControls.isInFocusChain()
+        if m.skipSegmentsManager.hasActiveSegment
+            m.videoControls.callFunc("clearFocus")
+            m.skipSegmentsManager.callFunc("focusSkipButton")
+        end if
+        return true ' edge of the row either way
+
+    else if isStringEqual(key, KeyCode.LEFT) and (m.videoControls.isInFocusChain() or m.optionControls.isInFocusChain())
+        return true ' edge of the row - no horizontal handoff between rows anymore
+
+    else if isStringEqual(key, KeyCode.RIGHT) and m.optionControls.isInFocusChain()
+        return true ' edge of the row - no horizontal handoff between rows anymore
+
+    end if
+
+    return false
+end function
+
+sub cleanupTimers()
+    ' Stop timers
+    if isValid(m.inactivityTimer)
+        m.inactivityTimer.control = "stop"
+        m.inactivityTimer.unobserveField("fire")
+    end if
+
+    ' Clean up MediaInfoTask
+    if isValid(m.mediaInfoTask)
+        m.mediaInfoTask.control = TaskControl.STOP
+        m.mediaInfoTask.unobserveField("data")
+    end if
+
+    ' Clean up progress bar observers
+    if isValid(m.progressBar)
+        m.progressBar.unobserveField("seek")
+        m.progressBar.unobserveField("isSeeking")
+        m.progressBar.unobserveField("previewPosition")
+        m.progressBar.unobserveField("keyPressed")
+        m.progressBar.unobserveField("seekActivity")
+    end if
+
+    ' Clean up video controls observers
+    if isValid(m.videoControls)
+        m.videoControls.unobserveField("action")
+        m.videoControls.unobserveField("keyPressed")
+    end if
+
+    ' Clean up option controls observers
+    if isValid(m.optionControls)
+        m.optionControls.unobserveField("action")
+        m.optionControls.unobserveField("navigationChanged")
+        m.optionControls.unobserveField("keyPressed")
+    end if
+
+    ' Clean up language panel observers
+    if isValid(m.languagePanel)
+        m.languagePanel.unobserveField("visible")
+        m.languagePanel.unobserveField("selectionMade")
+        m.languagePanel.unobserveField("keyPressed")
+    end if
+
+    ' Clean up media info panel observers
+    if isValid(m.mediaInfoPanel)
+        m.mediaInfoPanel.unobserveField("keyPressed")
+    end if
+
+    ' Clean up synopsis panel observers
+    if isValid(m.synopsisPanel)
+        m.synopsisPanel.unobserveField("keyPressed")
+    end if
+end sub

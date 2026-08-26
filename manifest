@@ -20,6 +20,7 @@ splash_screen_sd=pkg:/images/splash-screen_sd.png
 splash_min_time=1000
 
 ui_resolutions=fhd
+uri_resolution_autosub=$$RES$$,sd,hd,fhd
 
 confirm_partner_button=1
 
@@ -31,4 +32,3 @@ bs_const=printReg=false
 supports_voice_roinput=1
 supports_etc_seek=1
 supports_etc_next=1
-

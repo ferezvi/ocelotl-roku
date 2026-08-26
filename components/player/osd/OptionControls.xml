@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="OptionControls" extends="Group">
+    <interface>
+        <function name="focusControls" />
+        <function name="focusLast" />
+        <function name="clearFocus" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <field id="keyPressed" type="boolean" alwaysNotify="true" />
+        <field id="navigationChanged" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <children>
+        <LayoutGroup id="row" layoutDirection="horizontal" itemSpacings="[16]" vertAlignment="center">
+            <MDIconButton id="mediaInfoButton" size="Large" icon="pkg:/images/player/monitor-cog.png" />
+            <MDIconButton id="infoButton" size="Large" icon="pkg:/images/player/info.png" />
+            <MDIconButton id="languageButton" size="Large" icon="pkg:/images/player/languages.png" />
+        </LayoutGroup>
+    </children>
+</component>

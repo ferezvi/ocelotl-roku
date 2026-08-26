@@ -1,0 +1,36 @@
+<component name="ProgressBar" extends="Group">
+    <interface>
+        <field id="mediaSegments" type="assocarray" onChange="onMediaSegmentsChanged" />
+        <field id="barUri" type="uri" value="pkg:/images/player/progress_bar_$$RES$$.9.png" onChange="onBarUriChanged" />
+        <field id="trackColor" type="color" value="0xFFFFFF33" />
+        <field id="fillColor" type="color" value="0x7C3AEDFF" />
+        <field id="focusedTrackColor" type="color" value="0xFFFFFF66" onChange="onLayoutFieldsChanged" />
+        <field id="focusedFillColor" type="color" value="0x9D5CF5FF" onChange="onLayoutFieldsChanged" />
+        <field id="focused" type="boolean" value="false" onChange="onLayoutFieldsChanged" />
+        <field id="trackWidth" type="float" value="1714" onChange="onLayoutFieldsChanged" />
+        <field id="trackHeight" type="float" value="12" onChange="onLayoutFieldsChanged" />
+        <field id="previewFillColor" type="color" value="0x7C3AEDB3" onChange="onLayoutFieldsChanged" />
+        <field id="previewEraseColor" type="color" value="0xFFFFFF4D" onChange="onLayoutFieldsChanged" />
+        <!-- Playback data -->
+        <field id="position" type="float" value="0" onChange="onPositionChanged" />
+        <field id="duration" type="float" value="0" />
+        <field id="previewPosition" type="float" value="0" />
+        <field id="isSeeking" type="boolean" value="false" />
+        <field id="keyPressed" type="boolean" alwaysNotify="true" />
+        <field id="seekActivity" type="boolean" alwaysNotify="true" />
+
+        <!-- Emitted when user confirms a seek -->
+        <field id="seek" type="float" alwaysNotify="true" />
+        <function name="seekStep" />
+        <function name="cancelSeek" />
+    </interface>
+
+    <children>
+        <Poster id="track" />
+        <Poster id="previewForward" />
+        <Poster id="fill" />
+        <Poster id="previewErase" />
+        <Label id="currentTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" />
+        <Label id="remainingTime" font="font:SmallBoldSystemFont" color="0xFFFFFFCC" horizAlign="right" />
+    </children>
+</component>

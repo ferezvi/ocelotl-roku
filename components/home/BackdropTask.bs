@@ -1,0 +1,69 @@
+import "pkg:/source/api/Image.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.top.functionName = "fetchBackdrop"
+end sub
+
+function fetchBackdrop() as object
+    userId = m.top.userId
+    if not isValid(userId) or userId = ""
+        m.top.error = "No userId"
+        return {}
+    end if
+
+    url = "/Items?userId=" + userId + "&includeItemTypes=Movie,Series&recursive=true&sortBy=Random&limit=20&imageTypes=Backdrop"
+
+    req = APIRequest(url)
+    if not isValid(req)
+        m.top.error = "Failed to create request"
+        return {}
+    end if
+
+    response = req.GetToString()
+
+    if not isValid(response)
+        m.top.error = "No response"
+        return {}
+    end if
+
+    json = ParseJson(response)
+    if not isValid(json) or not isValid(json.Items)
+        m.top.error = "Invalid response"
+        return {}
+    end if
+
+    ' Determinar dimensiones según el dispositivo
+    if isValid(m.global.device) and m.global.device.isHDDevice = true
+        maxWidth = 1280
+        maxHeight = 720
+    else
+        maxWidth = 1920
+        maxHeight = 1080
+    end if
+
+    for each item in json.Items
+        if isValid(item.BackdropImageTags) and item.BackdropImageTags.Count() > 0
+            randomIndex = Rnd(item.BackdropImageTags.Count()) - 1
+            tag = item.BackdropImageTags[randomIndex]
+
+            backdropUrl = ImageURL(item.Id, ImageType.BACKDROP, {
+                tag: tag,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+                quality: "90"
+            })
+
+            m.top.backdrop = {
+                url: backdropUrl,
+                title: item.Name,
+                id: item.Id
+            }
+
+            return m.top.backdrop
+        end if
+    end for
+
+    m.top.error = "No backdrops found"
+    return {}
+end function

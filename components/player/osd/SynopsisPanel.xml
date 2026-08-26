@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<component name="SynopsisPanel" extends="Group">
+    <interface>
+        <field id="overview" type="string" />
+    </interface>
+
+    <children>
+        <Poster id="background" width="1800" height="250" opacity="0.94" uri="pkg:/images/white.9.png" />
+        <Label id="title" translation="[32, 28]" text="Synopsis" font="font:MediumBoldSystemFont" />
+        <Text id="overviewText" translation="[32, 72]" width="1736" height="150" font="font:SmallSystemFont" />
+    </children>
+</component>

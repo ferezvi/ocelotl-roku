@@ -9,12 +9,42 @@ sub preloadTrickplayImagesTask()
     fs = CreateObject("roFileSystem")
 
     if m.top.method = "ADD"
-        for tileIndex = 0 to m.top.numImagesToLoad
-            updatedURL = `Videos/${m.top.videoID}/Trickplay/${m.top.trickplayWidth}/${tileIndex}.jpg?ApiKey=${get_user_setting("token")}`
-            if not fs.Exists(`tmp:/${m.top.videoID}-${tileIndex}.jpg`)
-                APIRequest(updatedURL).gettofile(`tmp:/${m.top.videoID}-${tileIndex}.jpg`)
+        maxTile = m.top.numImagesToLoad
+        priorityTile = m.top.priorityTileIndex
+
+        ' --------------------------------------------------------
+        ' Pass 1: resume-position tile + the one right after it.
+        ' PlayerView holds VideoControl.PLAY until these are on disk,
+        ' so scrubbing near the resume point works immediately.
+        ' --------------------------------------------------------
+        if priorityTile >= 0 and priorityTile <= maxTile
+            if m.top.control = "stop" then return
+            downloadTrickplayTile(fs, priorityTile)
+
+            if priorityTile + 1 <= maxTile
+                if m.top.control = "stop" then return
+                downloadTrickplayTile(fs, priorityTile + 1)
+            end if
+        end if
+
+        ' Always notify, even when there was nothing to prioritize
+        ' (new video, priorityTile = -1), so PlayerView never waits forever.
+        m.top.priorityTilesReady = true
+
+        ' --------------------------------------------------------
+        ' Pass 2: everything else in normal order. Tile 0 still fires
+        ' firstTileReady for the invisible poster preload in Trickplay.bs.
+        ' Already-downloaded tiles from pass 1 are skipped via fs.Exists.
+        ' --------------------------------------------------------
+        for tileIndex = 0 to maxTile
+            if m.top.control = "stop" then return
+            downloadTrickplayTile(fs, tileIndex)
+
+            if tileIndex = 0
+                m.top.firstTileReady = true
             end if
         end for
+
         return
     end if
 
@@ -26,4 +56,16 @@ sub preloadTrickplayImagesTask()
         end for
         return
     end if
+end sub
+
+
+sub downloadTrickplayTile(fs as object, tileIndex as integer)
+    destPath = `tmp:/${m.top.videoID}-${tileIndex}.jpg`
+
+    if fs.Exists(destPath)
+        return
+    end if
+
+    url = `Videos/${m.top.videoID}/Trickplay/${m.top.trickplayWidth}/${tileIndex}.jpg?ApiKey=${get_user_setting("token")}`
+    APIRequest(url).gettofile(destPath)
 end sub

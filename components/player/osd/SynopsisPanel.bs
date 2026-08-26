@@ -1,0 +1,17 @@
+import "pkg:/source/enums/ColorPalette.bs"
+
+sub init()
+    m.background = m.top.findNode("background")
+    m.title = m.top.findNode("title")
+    m.overviewText = m.top.findNode("overviewText")
+
+    m.background.blendColor = ColorPalette.VIEWBACKGROUND
+    m.title.color = ColorPalette.PRIMARY_LIGHT
+    m.overviewText.color = ColorPalette.TEXT_PRIMARY
+
+    m.top.observeField("overview", "onOverviewChanged")
+end sub
+
+sub onOverviewChanged()
+    m.overviewText.text = m.top.overview
+end sub

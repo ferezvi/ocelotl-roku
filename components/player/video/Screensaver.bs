@@ -1,0 +1,165 @@
+import "pkg:/source/enums/TaskControl.bs"
+import "pkg:/source/utils/misc.bs"
+
+sub init()
+    m.overlay = m.top.findNode("overlay")
+    m.backdrop = m.top.findNode("backdrop")
+    m.logo = m.top.findNode("logo")
+    m.idleTimer = m.top.findNode("idleTimer")
+
+    m.inactivityCounter = 0
+    m.top.isActive = false
+    m.isFetchingBackdrop = false
+
+    m.rotationTimer = CreateObject("roSGNode", "Timer")
+    m.rotationTimer.duration = 60
+    m.rotationTimer.repeat = true
+    m.rotationTimer.observeField("fire", "onRotationTimerTick")
+    m.top.appendChild(m.rotationTimer)
+
+    m.backdropTask = CreateObject("roSGNode", "BackdropTask")
+    m.backdropTask.observeField("backdrop", "onBackdropFetched")
+    m.backdropTask.observeField("error", "onBackdropFetchError")
+    m.top.appendChild(m.backdropTask)
+
+    m.idleTimer.observeField("fire", "onIdleTimerTick")
+
+    m.logo.uri = "pkg:/images/logo.png"
+
+    if m.top.enabled
+        m.idleTimer.control = "start"
+    end if
+
+    m.top.visible = false
+    m.overlay.visible = false
+    m.backdrop.visible = false
+    m.logo.visible = false
+end sub
+
+sub onIdleTimerTick()
+    if not m.top.enabled then return
+
+    m.inactivityCounter = m.inactivityCounter + 1
+
+    if m.inactivityCounter >= m.top.idleTimeout
+        m.inactivityCounter = 0
+        m.idleTimer.control = "stop"
+        showScreensaver()
+    end if
+end sub
+
+sub onRotationTimerTick()
+    if not m.top.isActive
+        m.rotationTimer.control = "stop"
+        return
+    end if
+
+    fetchRandomBackdrop()
+end sub
+
+sub resetTimer()
+    if m.top.isActive
+        hideScreensaver()
+    end if
+
+    m.inactivityCounter = 0
+
+    if m.top.enabled and m.idleTimer.control <> "start"
+        m.idleTimer.control = "start"
+    end if
+end sub
+
+sub showScreensaver()
+    if m.top.isActive then return
+    if not m.top.enabled then return
+
+    m.top.isActive = true
+    m.top.visible = true
+    m.overlay.visible = true
+    m.backdrop.visible = true
+    m.logo.visible = true
+
+    fetchRandomBackdrop()
+    m.rotationTimer.control = "start"
+    m.top.setFocus(true)
+end sub
+
+sub hideScreensaver()
+    if not m.top.isActive then return
+
+    m.top.isActive = false
+    m.top.visible = false
+    m.overlay.visible = false
+    m.backdrop.visible = false
+    m.logo.visible = false
+
+    m.rotationTimer.control = "stop"
+    m.backdrop.callFunc("release")
+
+    m.top.setFocus(false)
+    m.global.sceneManager.callFunc("onScreensaverHidden")
+end sub
+
+sub hide()
+    hideScreensaver()
+end sub
+
+sub fetchRandomBackdrop()
+    if m.isFetchingBackdrop then return
+
+    m.isFetchingBackdrop = true
+
+    userId = m.global.session.user.id
+    if not isValid(userId) or userId = ""
+        m.isFetchingBackdrop = false
+        return
+    end if
+
+    ' Determine dimensions based on device capability
+    if isValid(m.global.device) and m.global.device.isHDDevice = true
+        maxWidth = 1280
+        maxHeight = 720
+    else
+        maxWidth = 1920
+        maxHeight = 1080
+    end if
+
+    m.backdropTask.maxWidth = maxWidth
+    m.backdropTask.maxHeight = maxHeight
+    m.backdropTask.userId = userId
+    m.backdropTask.control = TaskControl.RUN
+end sub
+
+sub onBackdropFetched(event)
+    m.isFetchingBackdrop = false
+    backdrop = event.getData()
+
+    if not isValid(backdrop) or not isValid(backdrop.url)
+        return
+    end if
+
+    m.backdrop.callFunc("setImage", backdrop.url)
+end sub
+
+sub onBackdropFetchError(event)
+    m.isFetchingBackdrop = false
+end sub
+
+sub setLogo(url as string)
+    if isValidAndNotEmpty(url)
+        m.logo.uri = url
+    end if
+end sub
+
+sub setBackdrop(url as string)
+    if isValidAndNotEmpty(url)
+        m.backdrop.callFunc("setImage", url)
+    end if
+end sub
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if press
+        resetTimer()
+    end if
+    return false
+end function

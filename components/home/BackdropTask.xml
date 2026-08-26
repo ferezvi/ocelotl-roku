@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="BackdropTask" extends="Task">
+    <interface>
+        <field id="userId" type="string" />
+        <field id="backdrop" type="assocarray" alwaysNotify="true" />
+        <field id="error" type="string" alwaysNotify="true" />
+        <field id="maxWidth" type="integer" value="1920" />
+        <field id="maxHeight" type="integer" value="1080" />
+    </interface>
+</component>
