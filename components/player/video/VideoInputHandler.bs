@@ -93,21 +93,15 @@ function onKeyEvent(key as string, press as boolean) as boolean
 end function
 
 sub handlePlayKey()
-    if not m.videoOsd.visible
-        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
-            m.top.control = VideoControl.PAUSE
-        end if
+    if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
+        m.top.control = VideoControl.PAUSE
+    else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
+        m.top.control = VideoControl.RESUME
+    end if
 
+    if not m.videoOsd.visible
         m.videoOsd.visible = true
         m.videoOsd.callFunc("focusControls")
-
-    else
-        if isStringEqual(m.top.state, MediaPlaybackState.PLAYING)
-            m.top.control = VideoControl.PAUSE
-
-        else if isStringEqual(m.top.state, MediaPlaybackState.PAUSED) or isStringEqual(m.top.state, MediaPlaybackState.STOPPED)
-            m.top.control = VideoControl.RESUME
-        end if
     end if
 end sub
 
