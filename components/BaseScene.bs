@@ -3,7 +3,7 @@ import "pkg:/source/enums/KeyCode.bs"
 import "pkg:/source/utils/misc.bs"
 
 sub init()
-    m.top.backgroundURI = ""
+    m.top.backgroundURI = "pkg:/images/background/base_background.png"
     m.spinner = m.top.findNode("spinner")
     m.screensaver = m.top.findNode("screensaver")
     m.screensaver.callFunc("setLogo", "pkg:/images/logo.png")

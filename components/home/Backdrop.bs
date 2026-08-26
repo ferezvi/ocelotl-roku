@@ -2,6 +2,7 @@ import "pkg:/source/api/Image.bs"
 import "pkg:/source/utils/misc.bs"
 
 const BACKDROP_OPACITY = 0.3
+const DEFAULT_BACKDROP = "pkg:/images/background/home_background.png"
 
 sub init()
     m.backdropA = m.top.findNode("backdropA")
@@ -19,6 +20,10 @@ sub init()
     m.inactiveBackdrop = m.backdropB
 
     m.pendingBackdropTarget = invalid
+
+    m.activeBackdrop.uri = DEFAULT_BACKDROP
+    m.activeBackdrop.opacity = BACKDROP_OPACITY
+    m.backdropBlack.opacity = 1.0
 end sub
 
 sub setImage(backdropUri as string)
@@ -162,11 +167,11 @@ end function
 sub setItem(item as object)
     backdropUri = getBackdropUri(item)
 
-    if backdropUri <> ""
-        setImage(backdropUri)
-    else
-        clear()
+    if backdropUri = ""
+        backdropUri = DEFAULT_BACKDROP
     end if
+
+    setImage(backdropUri)
 end sub
 
 sub release()
