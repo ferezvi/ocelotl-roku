@@ -8,6 +8,7 @@ sub init()
     m.top.optionsAvailable = false
     m.top.setFocus(true)
 
+
     m.serverPicker = m.top.findNode("serverPicker")
     m.serverUrlTextbox = m.top.findNode("serverUrlTextbox")
     m.serverUrlContainer = m.top.findNode("serverUrlContainer")
@@ -15,7 +16,7 @@ sub init()
     m.serverUrlOutline = m.top.findNode("serverUrlOutline")
     m.serverUrlOutline.blendColor = ColorPalette.HIGHLIGHT
 
-    m.serverPickerContainer.color = ColorPalette.ELEMENTBACKGROUND
+    m.serverPickerContainer.blendColor = ColorPalette.ELEMENTBACKGROUND
     m.serverUrlContainer.color = ColorPalette.BLACK77
 
     m.submit = m.top.findNode("submit")
