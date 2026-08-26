@@ -56,6 +56,9 @@ sub init()
     ' When the last form field is confirmed, jump focus straight to Submit
     m.config.observeField("allFieldsSubmitted", "onAllFieldsSubmitted")
 
+    m.signInFormContainer = m.top.findNode("signInFormContainer")
+    m.signInFormContainer.blendColor = ColorPalette.ELEMENTBACKGROUND
+
     username_field = CreateObject("roSGNode", "ConfigData")
     username_field.label = tr("Username")
     username_field.type = "string"

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="SigninScene" extends="JFScreen">
   <children>
+    <Rectangle id="overlayBackground" color="#000018" width="1920" height="1080" visible="true" />
     <Text
       text="Sign In"
       horizAlign="center"
@@ -15,9 +16,9 @@
       <Text id="errorMessage" text="" wrap="true" width="600" font="font:MediumSystemFont" horizAlign="center" translation="[10, 15]" />
     </Rectangle>
 
-    <Rectangle id="signInFormContainer" color="#101420" width="870" height="280" translation="[525, 466]">
+    <Poster id="signInFormContainer" uri="pkg:/images/ui/white_$$RES$$.9.png" width="870" height="280" translation="[525, 466]">
       <FormList id="configOptions" translation="[60, 40]" itemSpacing="[0, 50]" />
-    </Rectangle>
+    </Poster>
 
     <CheckList
       id="saveCredentials"
