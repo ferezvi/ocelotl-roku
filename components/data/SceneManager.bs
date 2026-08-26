@@ -66,6 +66,7 @@ sub pushScene(newGroup)
         'observe info about new group, set overhang title, etc.
         if newGroup.isSubType("JFGroup")
             registerOverhangData(newGroup)
+            updateScreensaverState(newGroup)
 
             if newGroup.isInFocusChain() = false
                 newGroup.setFocus(true)
@@ -86,6 +87,7 @@ sub popScene()
     if isValid(group)
         if group.isSubType("JFGroup")
             unregisterOverhangData(group)
+            updateScreensaverState(group)
             group.unobserveField("userActivity")
         end if
 
@@ -647,4 +649,16 @@ end sub
 
 sub onScreensaverHidden()
     restoreFocusToActiveScene()
+end sub
+
+'
+' Enable/disable screensaver based on active screen type
+sub updateScreensaverState(group)
+    if not isValid(m.global.screensaver) then return
+
+    if group.isSubType("SetServerScreen") or group.isSubType("SigninScene")
+        m.global.screensaver.callFunc("setEnabled", false)
+    else
+        m.global.screensaver.callFunc("setEnabled", true)
+    end if
 end sub

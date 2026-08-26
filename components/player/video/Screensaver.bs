@@ -11,6 +11,13 @@ sub init()
     m.top.isActive = false
     m.isFetchingBackdrop = false
 
+    ' Asegurar que el screensaver esté habilitado por defecto
+    if not m.top.hasField("enabled")
+        m.top.addField("enabled", "boolean", true)
+    end if
+
+    m.top.enabled = true ' Forzar habilitado
+
     m.rotationTimer = CreateObject("roSGNode", "Timer")
     m.rotationTimer.duration = 60
     m.rotationTimer.repeat = true
@@ -28,6 +35,9 @@ sub init()
 
     if m.top.enabled
         m.idleTimer.control = "start"
+        print "Screensaver init: timer iniciado"
+    else
+        print "Screensaver init: timer NO iniciado (enabled=false)"
     end if
 
     m.top.visible = false
@@ -163,3 +173,20 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
     return false
 end function
+
+sub setEnabled(value as boolean)
+    m.top.enabled = value
+
+    if not value
+        m.idleTimer.control = "stop"
+        m.inactivityCounter = 0
+        if m.top.isActive
+            hideScreensaver()
+        end if
+    else
+        m.inactivityCounter = 0
+        if m.idleTimer.control <> "start"
+            m.idleTimer.control = "start"
+        end if
+    end if
+end sub

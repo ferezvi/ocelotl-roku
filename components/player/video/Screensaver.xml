@@ -9,6 +9,7 @@
         <function name="hide" />
         <function name="setLogo" />
         <function name="setBackdrop" />
+        <function name="setEnabled" />
     </interface>
 
     <children>
