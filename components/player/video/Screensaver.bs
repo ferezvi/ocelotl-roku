@@ -35,9 +35,6 @@ sub init()
 
     if m.top.enabled
         m.idleTimer.control = "start"
-        print "Screensaver init: timer iniciado"
-    else
-        print "Screensaver init: timer NO iniciado (enabled=false)"
     end if
 
     m.top.visible = false
