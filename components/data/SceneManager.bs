@@ -27,6 +27,13 @@ sub updateBackdropVisibility(group as object)
         end if
     end for
 
+    for each screenType in getMemoryReleaseScreens()
+        if group.isSubType(screenType)
+            backdrop.callFunc("prepareForPlayback")
+            exit for
+        end if
+    end for
+
     backdrop.visible = shouldShow
 end sub
 
@@ -699,5 +706,15 @@ function getBackdropScreens() as object
         "MovieDetails",
         "TVSeasonDetails",
         "TVSeriesDetails"
+    ]
+end function
+
+' Screens that should trigger releasing the backdrop poster textures
+' before they take over the screen (frees memory for the video decoder).
+' The backdrop reloads on its own next time setItem() is called, since
+' prepareForPlayback() clears activeBackdrop.uri.
+function getMemoryReleaseScreens() as object
+    return [
+        "VideoPlayer"
     ]
 end function

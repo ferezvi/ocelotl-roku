@@ -199,3 +199,23 @@ sub release()
 
     m.backdropBlack.opacity = 0
 end sub
+
+' Called right before pushing a playback screen: unloads poster
+' textures to free memory for the video decoder, but keeps the solid
+' black base layer so any frame before the new backdrop fades back in
+' reads as intentional black, not the default image or transparency.
+sub prepareForPlayback()
+    m.pendingBackdropTarget = invalid
+
+    if isStringEqual(m.crossfadeAnimation.state, "running")
+        m.crossfadeAnimation.control = "stop"
+    end if
+
+    m.backdropA.opacity = 0
+    m.backdropB.opacity = 0
+
+    m.backdropA.uri = ""
+    m.backdropB.uri = ""
+
+    m.backdropBlack.opacity = 1.0
+end sub
