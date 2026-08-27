@@ -720,7 +720,9 @@ function getBackdropScreens() as object
         "Home",
         "MovieDetails",
         "TVSeasonDetails",
-        "TVSeriesDetails"
+        "TVSeriesDetails",
+        "AlbumView",
+        "ArtistView"
     ]
 end function
 

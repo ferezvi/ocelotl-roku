@@ -14,6 +14,9 @@ sub init()
 
     scene = m.top.getScene()
     if isValid(scene)
+        ' Get reference to centralized Backdrop at Scene level
+        m.backdrop = scene.findNode("backdrop")
+
         audioMiniPlayer = scene.findNode("audioMiniPlayer")
         if isValid(audioMiniPlayer)
             audioMiniPlayerVisibility = audioMiniPlayer.callFunc("isVisible")
@@ -22,11 +25,6 @@ sub init()
             end if
         end if
     end if
-
-    ' Load background image
-    m.LoadBackdropImageTask = CreateObject("roSGNode", "LoadItemsTask")
-    m.LoadBackdropImageTask.itemsToLoad = "backdropImage"
-    m.backDrop = m.top.findNode("backdrop")
 
     m.zoomCover = m.top.findNode("zoomCover")
     m.zoomCoverBackground = m.top.findNode("zoomCoverBackground")
@@ -78,31 +76,6 @@ sub init()
     m.songListRect.color = ColorPalette.BLACK77
 
     m.songList.observeField("doneLoading", "onDoneLoading")
-end sub
-
-sub setBackdropImage(itemContent)
-    ' Use metadata to load backdrop image
-    if not isChainValid(itemContent, "json.ArtistItems") then return
-    if not isValidAndNotEmpty(itemContent.json.ArtistItems) then return
-
-    artistID = itemContent.json.ArtistItems[0].LookupCI("id")
-    if not isValidAndNotEmpty(artistID) then return
-
-    m.LoadBackdropImageTask.itemId = artistID
-    m.LoadBackdropImageTask.observeField("content", "onBackdropImageLoaded")
-    m.LoadBackdropImageTask.control = TaskControl.RUN
-end sub
-
-sub onBackdropImageLoaded()
-    m.LoadBackdropImageTask.control = TaskControl.STOP
-    data = m.LoadBackdropImageTask.content[0]
-    m.LoadBackdropImageTask.unobserveField("content")
-
-    if isValidAndNotEmpty(data)
-        if not isStringEqual(m.backDrop.uri, data)
-            m.backDrop.uri = data
-        end if
-    end if
 end sub
 
 sub setFontSizes()
@@ -167,7 +140,9 @@ sub pageContentChanged()
         m.songList.isCompilation = false
     end if
 
-    setBackdropImage(item)
+    ' Set the backdrop image using the centralized Backdrop component
+    m.backdrop.callFunc("setItem", item)
+
     setPosterImage(item.posterURL)
     setScreenTitle(item.json)
     setOnScreenTextValues(item.json)

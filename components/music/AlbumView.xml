@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="AlbumView" extends="JFScreen">
   <children>
-    <Poster id="backdrop" opacity=".4" loadDisplayMode="scaleToZoom" width="1920" height="1080" blendColor="#3f3f3f" />
-
     <LayoutGroup id="toplevel" layoutDirection="vert" translation="[100, 100]" itemSpacings="[10]">
       <LayoutGroup layoutDirection="horiz" itemSpacings="[15]">
         <LayoutGroup layoutDirection="vert" itemSpacings="[25]">

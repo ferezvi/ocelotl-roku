@@ -45,11 +45,12 @@ sub init()
     m.sectionScroller.observeField("displayedIndex", "onSectionScrollerChange")
     m.overhang = m.top.getScene().findNode("overhang")
 
-    ' Load background image
-    m.LoadBackdropImageTask = CreateObject("roSGNode", "LoadItemsTask")
-    m.LoadBackdropImageTask.itemsToLoad = "backdropImage"
+    ' Get reference to centralized Backdrop at Scene level
+    scene = m.top.getScene()
+    if isValid(scene)
+        m.backdrop = scene.findNode("backdrop")
+    end if
 
-    m.backDrop = m.top.findNode("backdrop")
     m.artistImage = m.top.findNode("artistImage")
     m.dscr = m.top.findNode("overview")
     m.dscr.ellipsisText = tr("... (Press * to read more)")
@@ -199,10 +200,8 @@ end sub
 sub pageContentChanged()
     item = m.top.pageContent
 
-    ' Use metadata to load backdrop image
-    m.LoadBackdropImageTask.itemId = item.json.id
-    m.LoadBackdropImageTask.observeField("content", "onBackdropImageLoaded")
-    m.LoadBackdropImageTask.control = "RUN"
+    ' Use centralized Backdrop to set the image
+    m.backdrop.callFunc("setItem", item)
 
     m.LoadSimilarArtistTask.itemId = item.json.id
     m.LoadSimilarArtistTask.control = TaskControl.RUN
@@ -224,23 +223,6 @@ sub setPosterImage(posterURL)
     end if
 
     m.artistImage.uri = posterURL
-end sub
-
-sub onBackdropImageLoaded()
-    data = m.LoadBackdropImageTask.content[0]
-    m.LoadBackdropImageTask.unobserveField("content")
-    if isValid(data) and data <> ""
-        setBackdropImage(data)
-    end if
-end sub
-
-' Add backdrop image to screen
-sub setBackdropImage(data)
-    if isValid(data)
-        if m.backDrop.uri <> data
-            m.backDrop.uri = data
-        end if
-    end if
 end sub
 
 ' Event fired when page data is loaded
