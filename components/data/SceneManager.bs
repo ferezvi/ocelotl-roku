@@ -688,12 +688,27 @@ end sub
 sub updateScreensaverState(group)
     if not isValid(m.global.screensaver) then return
 
-    if group.isSubType("SetServerScreen") or group.isSubType("SigninScene")
-        m.global.screensaver.callFunc("setEnabled", false)
-    else
-        m.global.screensaver.callFunc("setEnabled", true)
-    end if
+    shouldEnable = false
+    for each screenType in getScreensaverScreens()
+        if group.isSubType(screenType)
+            shouldEnable = true
+            exit for
+        end if
+    end for
+
+    m.global.screensaver.callFunc("setEnabled", shouldEnable)
 end sub
+
+' Screens that should have screensaver enabled.
+' To enable screensaver on a new screen: add its component name here.
+function getScreensaverScreens() as object
+    return [
+        "Home",
+        "MovieDetails",
+        "TVSeasonDetails",
+        "TVSeriesDetails"
+    ]
+end function
 
 ' Screens that show the shared BaseScene-level Backdrop.
 ' To enable the backdrop on a new screen: add its component name here,
