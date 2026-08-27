@@ -16,7 +16,10 @@ sub init()
     m.top.optionsAvailable = false
     m.defaultClippingRect = "[-10,-10,2020,420]"
 
-    m.backdrop = m.top.findNode("backdrop")
+    scene = m.top.getScene()
+    if isValid(scene)
+        m.backdrop = scene.findNode("backdrop")
+    end if
     m.settingsButton = m.top.findNode("settingsButton")
     m.settingsButton.observeFieldScoped("selected", "onsettingsButtonSelected")
     m.settingsButton.highlightBackground = chainLookupReturn(m.global.session, "user.settings.colorCursor", ColorPalette.HIGHLIGHT)

@@ -21,7 +21,10 @@ sub init()
 
     m.scrollBarThumbSlideAnimation = m.top.findnode("scrollBarThumbSlideAnimation")
     m.scrollBarThumbSlideInterpolator = m.top.findnode("scrollBarThumbSlideInterpolator")
-    m.backdrop = m.top.findNode("backdrop")
+    scene = m.top.getScene()
+    if isValid(scene)
+        m.backdrop = scene.findNode("backdrop")
+    end if
 
     m.scrollBar = m.top.findnode("scrollBar")
     m.thumb = m.top.findnode("thumb")

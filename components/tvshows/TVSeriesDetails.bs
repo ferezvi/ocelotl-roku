@@ -17,7 +17,10 @@ sub init()
     m.overview = m.top.findNode("overview")
     m.playedIndicator = m.top.findNode("playedIndicator")
     m.tvshowPoster = m.top.findNode("tvshowPoster")
-    m.backdrop = m.top.findNode("backdrop")
+    scene = m.top.getScene()
+    if isValid(scene)
+        m.backdrop = scene.findNode("backdrop")
+    end if
 
     m.overview.ellipsisText = tr("...")
     m.loadStatus = ViewLoadStatus.INIT

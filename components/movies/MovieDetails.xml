@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="MovieDetails" extends="JFScreen">
   <children>
-    <Backdrop id="backdrop" />
     <LayoutGroup id="container" layoutDirection="vert" itemSpacings="[30]" translation="[100, 320]">
       <LayoutGroup id="infoGroup" layoutDirection="horiz" horizAlignment="left" itemSpacings="[20]">
         <Text id="releaseYear" font="font:SmallestSystemFont" />

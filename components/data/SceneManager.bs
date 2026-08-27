@@ -10,10 +10,33 @@ sub init()
     m.overhang = m.scene.findNode("overhang")
 end sub
 
+sub updateBackdropVisibility(group as object)
+    if not isValid(group) then return
+
+    scene = m.top.getScene()
+    if not isValid(scene) then return
+
+    backdrop = scene.findNode("backdrop")
+    if not isValid(backdrop) then return
+
+    shouldShow = false
+    for each screenType in getBackdropScreens()
+        if group.isSubType(screenType)
+            shouldShow = true
+            exit for
+        end if
+    end for
+
+    backdrop.visible = shouldShow
+end sub
+
 '
 ' Push a new group onto the stack, replacing the existing group on the screen
 sub pushScene(newGroup)
     currentGroup = m.groups.peek()
+
+    updateBackdropVisibility(newGroup)
+
     if isValid(newGroup)
         if not newGroup.hasField("lastFocus")
             newGroup.addField("lastFocus", "node", true)
@@ -105,6 +128,8 @@ sub popScene()
 
     if isValid(group)
         registerOverhangData(group)
+
+        updateBackdropVisibility(group)
 
         ' If we are moving back to anything other than a movie detail view, reset preferred audio track index
         if not group.isSubType("MovieDetails")
@@ -662,3 +687,17 @@ sub updateScreensaverState(group)
         m.global.screensaver.callFunc("setEnabled", true)
     end if
 end sub
+
+' Screens that show the shared BaseScene-level Backdrop.
+' To enable the backdrop on a new screen: add its component name here,
+' and grab the node in that screen's init() via:
+'   scene = m.top.getScene()
+'   if isValid(scene) then m.backdrop = scene.findNode("backdrop")
+function getBackdropScreens() as object
+    return [
+        "Home",
+        "MovieDetails",
+        "TVSeasonDetails",
+        "TVSeriesDetails"
+    ]
+end function

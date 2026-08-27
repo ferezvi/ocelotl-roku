@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component name="Home" extends="JFScreen">
   <children>
-    <Backdrop id="backdrop" />
-
     <LayoutGroup id="buttons" translation="[100, 100]" layoutDirection="horiz" horizAlignment="left" itemSpacings="[25]">
       <TextButton
         id="searchButton"

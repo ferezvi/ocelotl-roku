@@ -2,6 +2,7 @@ import "pkg:/source/api/Image.bs"
 import "pkg:/source/utils/misc.bs"
 
 const BACKDROP_OPACITY = 0.3
+const DEFAULT_BACKDROP_OPACITY = 1.0
 const DEFAULT_BACKDROP = "pkg:/images/background/home_background.png"
 
 sub init()
@@ -20,13 +21,14 @@ sub init()
     m.inactiveBackdrop = m.backdropB
 
     m.pendingBackdropTarget = invalid
+    m.targetOpacity = DEFAULT_BACKDROP_OPACITY
 
     m.activeBackdrop.uri = DEFAULT_BACKDROP
-    m.activeBackdrop.opacity = BACKDROP_OPACITY
+    m.activeBackdrop.opacity = DEFAULT_BACKDROP_OPACITY
     m.backdropBlack.opacity = 1.0
 end sub
 
-sub setImage(backdropUri as string)
+sub setImage(backdropUri as string, targetOpacity = BACKDROP_OPACITY as float)
     if backdropUri = ""
         clear()
         return
@@ -39,13 +41,14 @@ sub setImage(backdropUri as string)
 
     ' Image already loaded in the inactive poster
     if backdropUri = m.inactiveBackdrop.uri and m.inactiveBackdrop.loadStatus = "ready"
-        startBackdropFade(m.activeBackdrop, m.inactiveBackdrop)
+        startBackdropFade(m.activeBackdrop, m.inactiveBackdrop, targetOpacity)
         return
     end if
 
     ' Load into the inactive poster
     m.pendingBackdropTarget = m.inactiveBackdrop
     m.inactiveBackdrop.uri = backdropUri
+    m.targetOpacity = targetOpacity
 end sub
 
 sub clear()
@@ -71,10 +74,11 @@ sub onBackdropLoaded(event as object)
     if not node.isSameNode(m.pendingBackdropTarget) then return
     if node.loadStatus <> "ready" then return
 
-    startBackdropFade(m.activeBackdrop, node)
+    targetOpacity = isValid(m.targetOpacity) ? m.targetOpacity : BACKDROP_OPACITY
+    startBackdropFade(m.activeBackdrop, node, targetOpacity)
 end sub
 
-sub startBackdropFade(outgoing as object, incoming as object)
+sub startBackdropFade(outgoing as object, incoming as object, targetOpacity = BACKDROP_OPACITY as float)
     if isStringEqual(m.crossfadeAnimation.state, "running")
         m.crossfadeAnimation.control = "stop"
     end if
@@ -87,7 +91,7 @@ sub startBackdropFade(outgoing as object, incoming as object)
     incomingInterpolator = incoming.isSameNode(m.backdropA) ? m.backdropAFade : m.backdropBFade
 
     outgoingInterpolator.keyValue = [outgoing.opacity, 0.0]
-    incomingInterpolator.keyValue = [incoming.opacity, BACKDROP_OPACITY]
+    incomingInterpolator.keyValue = [incoming.opacity, targetOpacity]
 
     m.backdropBlack.opacity = 1.0
 
@@ -95,6 +99,7 @@ sub startBackdropFade(outgoing as object, incoming as object)
     m.inactiveBackdrop = outgoing
 
     m.pendingBackdropTarget = invalid
+    m.targetOpacity = targetOpacity
 
     m.crossfadeAnimation.control = "start"
 end sub
@@ -171,7 +176,12 @@ sub setItem(item as object)
         backdropUri = DEFAULT_BACKDROP
     end if
 
-    setImage(backdropUri)
+    targetOpacity = DEFAULT_BACKDROP_OPACITY
+    if backdropUri <> DEFAULT_BACKDROP
+        targetOpacity = BACKDROP_OPACITY
+    end if
+
+    setImage(backdropUri, targetOpacity)
 end sub
 
 sub release()
