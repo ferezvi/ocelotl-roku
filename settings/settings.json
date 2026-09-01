@@ -667,11 +667,15 @@
             "description": "Overlay a background image over the channel's background color",
             "settingName": "imageBackground",
             "type": "radio",
-            "default": "",
+            "default": "pkg:/images/background/bg3.jpg",
             "options": [
               {
                 "title": "None",
                 "id": ""
+              },
+              {
+                "title": "Aurora",
+                "id": "pkg:/images/background/bg3.jpg"
               },
               {
                 "title": "Circles",
