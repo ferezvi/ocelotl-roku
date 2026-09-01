@@ -46,5 +46,6 @@
         <function name="setImage" />
         <function name="clear" />
         <function name="release" />
+        <function name="setDefaultBackdrop" />
     </interface>
 </component>
